@@ -1,3 +1,4 @@
+// GecexCore - Gelişmiş Mikroservis Platformu (Railway için Optimize Edilmiş)
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const mongoose = require('mongoose');
@@ -320,9 +321,12 @@ class GecexCore extends EventEmitter {
       if (!query) {
         return res.status(400).json({ error: 'Arama sorgusu gerekli' });
       }
+      if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
+        return res.status(400).json({ error: 'Google Arama için API anahtarı veya motor ID eksik' });
+      }
 
       try {
-        const response = await axios.get('[invalid url, do not cite] {
+        const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
           params: {
             key: GOOGLE_SEARCH_API_KEY,
             cx: GOOGLE_SEARCH_ENGINE_ID,
@@ -486,7 +490,7 @@ class GecexCore extends EventEmitter {
       if (this.plugins.has('character') && ANTHROPIC_API_KEY) {
         orchestration.steps.push('character_analysis');
         const userAnalysis = await axios.post(
-          '[invalid url, do not cite]
+          'https://api.anthropic.com/v1/messages',
           {
             model: 'claude-3-5-sonnet-20241022',
             max_tokens: 1000,
@@ -501,7 +505,7 @@ class GecexCore extends EventEmitter {
       if (this.plugins.has('ai') && OPENAI_API_KEY) {
         orchestration.steps.push('ai_generation');
         const aiResponse = await axios.post(
-          '[invalid url, do not cite]
+          'https://api.openai.com/v1/chat/completions',
           {
             model: 'gpt-4',
             messages: [{ role: 'user', content: message }],
@@ -516,7 +520,7 @@ class GecexCore extends EventEmitter {
       if (this.plugins.has('deepseek') && DEEPSEEK_API_KEY) {
         orchestration.steps.push('deepseek_analysis');
         const deepResponse = await axios.post(
-          '[invalid url, do not cite]
+          'https://api.deepseek.com/v1/chat/completions',
           {
             model: 'deepseek-pro',
             messages: [{ role: 'user', content: `Analiz et: ${message}` }],
