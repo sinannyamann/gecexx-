@@ -28,8 +28,16 @@ const {
 } = process.env;
 
 // Kritik ortam değişkenlerini doğrula
-if (!MONGODB_URI || !SESSION_SECRET || !OPENAI_API_KEY) {
-  console.error('Missing required environment variables: MONGODB_URI, SESSION_SECRET, OPENAI_API_KEY');
+if (!MONGODB_URI) {
+  console.error('Missing required environment variable: MONGODB_URI');
+  process.exit(1);
+}
+if (!SESSION_SECRET) {
+  console.error('Missing required environment variable: SESSION_SECRET');
+  process.exit(1);
+}
+if (!OPENAI_API_KEY) {
+  console.error('Missing required environment variable: OPENAI_API_KEY');
   process.exit(1);
 }
 
