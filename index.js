@@ -1,22 +1,18 @@
 const express = require('express');
 const { WebSocketServer } = require('ws');
-const mongoose = require('mongoose');
 const { Client } = require('pg');
 const axios = require('axios');
 const { Octokit } = require('@octokit/rest');
 const ngrok = require('ngrok');
 const EventEmitter = require('events');
-const MongoStore = require('connect-mongo');
+const session = require('express-session');
+const PGSimpleStore = require('connect-pg-simple')(session);
 require('dotenv').config();
-
-// Mongoose strictQuery uyarısını bastır
-mongoose.set('strictQuery', true);
 
 // Token'ların ortam değişkenlerinden alınması
 const {
   SESSION_SECRET = 'default-secret', // Geliştirme için yedek
   OPENAI_API_KEY,
-  MONGODB_URI,
   PGDATABASE,
   PGHOST,
   PGPORT,
@@ -31,10 +27,6 @@ const {
 } = process.env;
 
 // Kritik ortam değişkenlerini doğrula
-if (!MONGODB_URI) {
-  console.error('Eksik ortam değişkeni: MONGODB_URI');
-  process.exit(1);
-}
 if (!SESSION_SECRET) {
   console.error('Eksik ortam değişkeni: SESSION_SECRET');
   process.exit(1);
@@ -43,17 +35,10 @@ if (!OPENAI_API_KEY) {
   console.error('Eksik ortam değişkeni: OPENAI_API_KEY');
   process.exit(1);
 }
-
-// MongoDB Şema Tanımları
-const chatSchema = new mongoose.Schema({
-  requestId: String,
-  username: String,
-  message: String,
-  response: String,
-  context: Object,
-  timestamp: { type: Date, default: Date.now }
-});
-const Chat = mongoose.model('Chat', chatSchema);
+if (!PGUSER || !PGHOST || !PGDATABASE || !PGPASSWORD || !PGPORT) {
+  console.error('Eksik PostgreSQL ortam değişkenleri: PGUSER, PGHOST, PGDATABASE, PGPASSWORD, PGPORT');
+  process.exit(1);
+}
 
 class GecexCore extends EventEmitter {
   constructor() {
@@ -100,40 +85,34 @@ class GecexCore extends EventEmitter {
 
   async setupDatabase() {
     try {
-      // MONGODB_URI doğrulaması
-      if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
-        throw new Error('MONGODB_URI "mongodb://" veya "mongodb+srv://" ile başlamalı');
-      }
+      await this.pgClient.connect();
+      this.log('info', 'PostgreSQL bağlantısı başarılı');
 
-      // MongoDB Bağlantısı
-      await mongoose.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        tls: true,
-        retryWrites: true,
-        maxPoolSize: 10,
-        serverSelectionTimeoutMS: 5000
-      });
-      this.log('info', 'MongoDB bağlantısı başarılı');
+      // Kullanıcı tablosu oluşturma
+      await this.pgClient.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          username VARCHAR(255) UNIQUE NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-      // PostgreSQL Bağlantısı (isteğe bağlı)
-      if (PGUSER && PGHOST && PGDATABASE && PGPASSWORD && PGPORT) {
-        await this.pgClient.connect();
-        this.log('info', 'PostgreSQL bağlantısı başarılı');
+      // Chat tablosu oluşturma
+      await this.pgClient.query(`
+        CREATE TABLE IF NOT EXISTS chats (
+          id SERIAL PRIMARY KEY,
+          request_id VARCHAR(255) NOT NULL,
+          username VARCHAR(255) NOT NULL,
+          message TEXT NOT NULL,
+          response TEXT,
+          context JSONB,
+          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-        // Kullanıcı tablosu oluşturma
-        await this.pgClient.query(`
-          CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(255) UNIQUE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-      } else {
-        this.log('info', 'PostgreSQL ortam değişkenleri eksik, bağlantı atlanıyor');
-      }
+      // Oturum tablosu için connect-pg-simple tarafından otomatik oluşturuluyor
     } catch (error) {
-      this.log('error', 'Veritabanı bağlantısı başarısız', { error: error.message });
+      this.log('error', 'PostgreSQL bağlantısı başarısız', { error: error.message });
       process.exit(1);
     }
   }
@@ -141,13 +120,13 @@ class GecexCore extends EventEmitter {
   setupCore() {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
-    this.app.use(require('express-session')({
+    this.app.use(session({
       secret: SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
-      store: MongoStore.create({
-        mongoUrl: MONGODB_URI,
-        collectionName: 'sessions'
+      store: new PGSimpleStore({
+        client: this.pgClient,
+        tableName: 'sessions'
       }),
       cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 gün
     }));
@@ -484,16 +463,14 @@ class GecexCore extends EventEmitter {
     };
 
     try {
-      // Kullanıcı kaydı (PostgreSQL isteğe bağlı)
-      if (this.pgClient._connected) {
-        await this.pgClient.query(
-          'INSERT INTO users (username) VALUES ($1) ON CONFLICT DO NOTHING',
-          [username]
-        );
-      }
+      // Kullanıcı kaydı
+      await this.pgClient.query(
+        'INSERT INTO users (username) VALUES ($1) ON CONFLICT DO NOTHING',
+        [username]
+      );
 
       // Karakter analizi (Anthropic)
-      if (this.plugins.has('character') && ANTHROPIC_API_KEY) {
+      if (this.plugins.has('character') && ANTHROPIC_API_KEY “‘[invalid url, do not cite] {
         orchestration.steps.push('character_analysis');
         const userAnalysis = await axios.post(
           'https://api.anthropic.com/v1/messages',
@@ -547,14 +524,12 @@ class GecexCore extends EventEmitter {
         orchestration.result.github = { repo: repo.data.full_name };
       }
 
-      // Veritabanına kaydetme
-      await new Chat({
-        requestId,
-        username,
-        message,
-        response: orchestration.result.response || 'Yanıt yok',
-        context
-      }).save();
+      // Veritabanına kaydetme (PostgreSQL)
+      await this.pgClient.query(
+        `INSERT INTO chats (request_id, username, message, response, context, timestamp)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [requestId, username, message, orchestration.result.response || 'Yanıt yok', context || {}, new Date()]
+      );
 
       // Analitik kaydı
       if (this.plugins.has('analytics')) {
@@ -629,10 +604,7 @@ class GecexCore extends EventEmitter {
     this.log('info', 'GecexCore Platformu kapatılıyor...');
 
     this.emit('platform:shutdown');
-    await mongoose.connection.close();
-    if (this.pgClient._connected) {
-      await this.pgClient.end();
-    }
+    await this.pgClient.end();
     await ngrok.disconnect();
 
     return new Promise((resolve) => {
