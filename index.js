@@ -70,7 +70,7 @@ class GecexCore extends EventEmitter {
       database: PGDATABASE,
       password: PGPASSWORD,
       port: PGPORT,
-      connectionString: process.env.POSTGRES_URL || `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}`
+      connectionString: process.env.POSTGRES_URL || postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}
     });
 
     // GitHub Entegrasyonu
@@ -95,13 +95,13 @@ class GecexCore extends EventEmitter {
       this.log('info', 'PostgreSQL bağlantısı başarılı');
 
       // Kullanıcı tablosu oluşturma
-      await this.pgClient.query(`
+      await this.pgClient.query(
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
           username VARCHAR(255) UNIQUE NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-      `);
+      );
     } catch (error) {
       this.log('error', 'Veritabanı bağlantısı başarısız', { error: error.message });
       process.exit(1);
@@ -122,7 +122,7 @@ class GecexCore extends EventEmitter {
       this.metrics.requests++;
       this.metrics.activeConnections++;
 
-      req.gecexId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      req.gecexId = req_${Date.now()}_${Math.random().toString(36).substr(2, 9)};
       req.startTime = Date.now();
 
       res.on('finish', () => {
@@ -150,7 +150,7 @@ class GecexCore extends EventEmitter {
         addr: this.config.port,
         authtoken: NGROK_AUTH_TOKEN
       });
-      this.log('info', `Ngrok tüneli oluşturuldu: ${url}`);
+      this.log('info', Ngrok tüneli oluşturuldu: ${url});
       this.emit('ngrok:connected', { url });
     } catch (error) {
       this.log('error', 'Ngrok bağlantısı başarısız', { error: error.message });
@@ -170,7 +170,7 @@ class GecexCore extends EventEmitter {
             message: data.message,
             username: data.username || 'anonymous',
             context: data.context || {},
-            requestId: `ws_${Date.now()}`
+            requestId: ws_${Date.now()}
           });
           ws.send(JSON.stringify(response));
         } catch (error) {
@@ -183,7 +183,7 @@ class GecexCore extends EventEmitter {
         this.log('info', 'WebSocket bağlantısı kapandı');
       });
     });
-    this.log('info', `WebSocket sunucusu ${this.config.wsPort} portunda başlatıldı`);
+    this.log('info', WebSocket sunucusu ${this.config.wsPort} portunda başlatıldı);
   }
 
   setupCoreRoutes() {
@@ -323,7 +323,7 @@ class GecexCore extends EventEmitter {
 
     if (pluginConfig.routes) {
       Object.entries(pluginConfig.routes).forEach(([route, handler]) => {
-        const fullRoute = `/api/${name}${route}`;
+        const fullRoute = /api/${name}${route};
         this.app.all(fullRoute, async (req, res) => {
           try {
             const result = await handler(req, res, this);
@@ -340,7 +340,7 @@ class GecexCore extends EventEmitter {
     }
 
     this.emit('plugin:registered', { name, plugin });
-    this.log('info', `Eklenti kaydedildi: ${name} v${plugin.version}`);
+    this.log('info', Eklenti kaydedildi: ${name} v${plugin.version});
 
     return plugin;
   }
@@ -360,7 +360,7 @@ class GecexCore extends EventEmitter {
 
     this.services.set(name, service);
     this.emit('service:registered', { name, service });
-    this.log('info', `Servis kaydedildi: ${name} at ${service.url}`);
+    this.log('info', Servis kaydedildi: ${name} at ${service.url});
 
     this.startServiceHealthCheck(name);
     return service;
@@ -371,11 +371,11 @@ class GecexCore extends EventEmitter {
     const plugin = this.plugins.get(pluginName);
 
     if (!plugin) {
-      throw new Error(`Eklenti bulunamadı: ${pluginName}`);
+      throw new Error(Eklenti bulunamadı: ${pluginName});
     }
 
     if (plugin.status !== 'active') {
-      throw new Error(`Eklenti aktif değil: ${pluginName}`);
+      throw new Error(Eklenti aktif değil: ${pluginName});
     }
 
     this.metrics.pluginCalls[pluginName]++;
@@ -409,7 +409,7 @@ class GecexCore extends EventEmitter {
     const checkHealth = async () => {
       const startTime = Date.now();
       try {
-        const response = await axios.get(`${service.url}/health`, {
+        const response = await axios.get(${service.url}/health, {
           timeout: service.timeout
         });
 
@@ -456,7 +456,7 @@ class GecexCore extends EventEmitter {
           {
             model: 'claude-3-5-sonnet-20241022',
             max_tokens: 1000,
-            messages: [{ role: 'user', content: `Kullanıcı: ${username}, Mesaj: ${message}. Kullanıcı davranışını analiz et.` }]
+            messages: [{ role: 'user', content: Kullanıcı: ${username}, Mesaj: ${message}. Kullanıcı davranışını analiz et. }]
           },
           { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' } }
         );
@@ -473,7 +473,7 @@ class GecexCore extends EventEmitter {
             messages: [{ role: 'user', content: message }],
             max_tokens: 1500
           },
-          { headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` } }
+          { headers: { 'Authorization': Bearer ${OPENAI_API_KEY} } }
         );
         orchestration.result.response = aiResponse.data.choices[0].message.content;
       }
@@ -485,10 +485,10 @@ class GecexCore extends EventEmitter {
           'https://api.deepseek.com/v1/chat/completions',
           {
             model: 'deepseek-pro',
-            messages: [{ role: 'user', content: `Analiz et: ${message}` }],
+            messages: [{ role: 'user', content: Analiz et: ${message} }],
             max_tokens: 1000
           },
-          { headers: { 'Authorization': `Bearer ${DEEPSEEK_API_KEY}` } }
+          { headers: { 'Authorization': Bearer ${DEEPSEEK_API_KEY} } }
         );
         orchestration.result.deepAnalysis = deepResponse.data.choices[0].message.content;
       }
@@ -559,7 +559,7 @@ class GecexCore extends EventEmitter {
       platform: 'GecexCore'
     };
 
-    console.log(`[${logEntry.timestamp}] [${level.toUpperCase()}] ${message}`, data);
+    console.log([${logEntry.timestamp}] [${level.toUpperCase()}] ${message}, data);
     this.emit('log', logEntry);
   }
 
@@ -567,12 +567,12 @@ class GecexCore extends EventEmitter {
   async start() {
     return new Promise((resolve) => {
       this.app.listen(this.config.port, () => {
-        this.log('info', `GecexCore Platformu ${this.config.port} portunda başlatıldı`);
-        this.log('info', `Ortam: ${this.config.environment}`);
-        this.log('info', `Sağlık Kontrolü: http://localhost:${this.config.port}/gecex/health`);
-        this.log('info', `Eklenti API: http://localhost:${this.config.port}/api/*`);
-        this.log('info', `Gelişmiş Sohbet: http://localhost:${this.config.port}/gecex/chat`);
-        this.log('info', `WebSocket: ws://localhost:${this.config.wsPort}`);
+        this.log('info', GecexCore Platformu ${this.config.port} portunda başlatıldı);
+        this.log('info', Ortam: ${this.config.environment});
+        this.log('info', Sağlık Kontrolü: http://localhost:${this.config.port}/gecex/health);
+        this.log('info', Eklenti API: http://localhost:${this.config.port}/api/*);
+        this.log('info', Gelişmiş Sohbet: http://localhost:${this.config.port}/gecex/chat);
+        this.log('info', WebSocket: ws://localhost:${this.config.wsPort});
 
         this.emit('platform:started');
         resolve();
@@ -646,4 +646,26 @@ core.start();
 module.exports = GecexCore;
 
 
+json 
 
+{
+  "name": "gecexcore",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "events": "^3.3.0",
+    "express-session": "^1.17.3",
+    "mongoose": "^7.6.3",
+    "pg": "^8.11.3",
+    "@octokit/rest": "^20.0.1",
+    "ngrok": "^4.3.3",
+    "ws": "^8.13.0",
+    "openai": "^4.21.0"
+  }
+}
