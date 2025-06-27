@@ -1,4 +1,3 @@
-// GecexCore - Gelişmiş Mikroservis Platformu (Railway için Optimize Edilmiş)
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const mongoose = require('mongoose');
@@ -9,6 +8,9 @@ const ngrok = require('ngrok');
 const EventEmitter = require('events');
 const MongoStore = require('connect-mongo');
 require('dotenv').config();
+
+// Mongoose strictQuery uyarısını bastır
+mongoose.set('strictQuery', true);
 
 // Token'ların ortam değişkenlerinden alınması
 const {
@@ -106,7 +108,11 @@ class GecexCore extends EventEmitter {
       // MongoDB Bağlantısı
       await mongoose.connect(MONGODB_URI, {
         useNewUrlParser: true,
-        useUnifiedTopology: true
+        useUnifiedTopology: true,
+        tls: true,
+        retryWrites: true,
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 5000
       });
       this.log('info', 'MongoDB bağlantısı başarılı');
 
