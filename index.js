@@ -110,7 +110,7 @@ class GecexCore extends EventEmitter {
         )
       `);
 
-      // Oturum tablosu için connect-pg-simple tarafından otomatik oluşturuluyor
+      // Oturum tablosu connect-pg-simple tarafından otomatik oluşturulur
     } catch (error) {
       this.log('error', 'PostgreSQL bağlantısı başarısız', { error: error.message });
       process.exit(1);
@@ -470,7 +470,7 @@ class GecexCore extends EventEmitter {
       );
 
       // Karakter analizi (Anthropic)
-      if (this.plugins.has('character') && ANTHROPIC_API_KEY “‘[invalid url, do not cite] {
+      if (this.plugins.has('character') && ANTHROPIC_API_KEY) {
         orchestration.steps.push('character_analysis');
         const userAnalysis = await axios.post(
           'https://api.anthropic.com/v1/messages',
