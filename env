@@ -1,6 +1,6 @@
 SESSION_SECRET="gw0l96shvyzAvMdO4Bcr1oa/UDhyne99D0GSGGlMo0MpwXDnCSMGfLaXqy1+0PRiIRdKwngs0xqsowBVwKV0Jg=="
 OPENAI_API_KEY="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"
-DATABASE_URL="postgresql://neondb_owner:npg_rTMwBl6CD5Ft@ep-icy-sky-a5ewvdif.us-east-2.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL=ghcr.io/railwayapp-templates/postgres-ssl:16
 PGDATABASE="neondb"
 PGHOST="ep-icy-sky-a5ewvdif.us-east-2.aws.neon.tech"
 PGPORT="5432"
