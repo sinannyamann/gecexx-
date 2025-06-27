@@ -10,14 +10,13 @@
   "dependencies": {
     "express": "^4.17.1",
     "ws": "^8.8.0",
-    "mongoose": "^6.4.0",
     "pg": "^8.7.3",
     "axios": "^0.27.2",
     "@octokit/rest": "^19.0.3",
     "ngrok": "^4.3.1",
     "dotenv": "^16.0.0",
     "express-session": "^1.17.3",
-    "connect-mongo": "^5.1.0"
+    "connect-pg-simple": "^9.0.0"
   },
   "author": "",
   "license": "ISC"
