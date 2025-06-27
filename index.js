@@ -11,9 +11,9 @@ require('dotenv').config();
 
 // Token'ların ortam değişkenlerinden alınması
 const {
-  SESSION_SECRET,
+  SESSION_SECRET = 'default-secret', // Fallback for development
   OPENAI_API_KEY,
-  DATABASE_URL,
+  MONGODB_URI,
   PGDATABASE,
   PGHOST,
   PGPORT,
@@ -26,6 +26,12 @@ const {
   GOOGLE_SEARCH_ENGINE_ID,
   NGROK_AUTH_TOKEN
 } = process.env;
+
+// Kritik ortam değişkenlerini doğrula
+if (!MONGODB_URI || !SESSION_SECRET || !OPENAI_API_KEY) {
+  console.error('Missing required environment variables: MONGODB_URI, SESSION_SECRET, OPENAI_API_KEY');
+  process.exit(1);
+}
 
 // MongoDB Şema Tanımları
 const chatSchema = new mongoose.Schema({
@@ -83,8 +89,13 @@ class GecexCore extends EventEmitter {
 
   async setupDatabase() {
     try {
+      // MONGODB_URI doğrulaması
+      if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
+        throw new Error('MONGODB_URI must start with "mongodb://" or "mongodb+srv://"');
+      }
+
       // MongoDB Bağlantısı
-      await mongoose.connect(DATABASE_URL, {
+      await mongoose.connect(MONGODB_URI, {
         useNewUrlParser: true,
         useUnifiedTopology: true
       });
@@ -644,3 +655,14 @@ core.registerPlugin('analytics', {
 core.start();
 
 module.exports = GecexCore;
+process.on('exit', (code) => {
+  console.log(`Process exiting with code: ${code}`);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
