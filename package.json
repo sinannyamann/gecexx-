@@ -1,23 +1,52 @@
 {
-  "name": "advanced-personal-ai",
+  "name": "railway-advanced-ai-agent",
   "version": "2.0.0",
-  "description": "Gelişmiş Kişisel AI Sistemi",
-  "main": "index.js",
   "type": "module",
+  "description": "Advanced AI Agent with LangChain, code execution, memory, and web interface",
+  "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@langchain/openai": "^0.0.28",
+    "@langchain/community": "^0.0.43",
+    "@langchain/core": "^0.1.52",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "pg": "^8.11.3",
+    "vm2": "^3.9.19",
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "node-cron": "^3.0.3",
+    "ws": "^8.14.2",
+    "uuid": "^9.0.1",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.32.6",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0",
+    "csv-parser": "^3.0.0",
+    "xlsx": "^0.18.5"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "compression": "^1.7.4",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "express-rate-limit": "^6.7.0",
-    "helmet": "^7.0.0",
-    "natural": "^6.5.0",
-    "pg": "^8.11.3",
-    "winston": "^3.10.0"
-  }
+  "keywords": [
+    "ai",
+    "agent",
+    "langchain",
+    "openai",
+    "railway",
+    "chatbot",
+    "automation"
+  ],
+  "author": "Advanced AI Agent",
+  "license": "MIT"
 }
