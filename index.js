@@ -24,11 +24,7 @@ import XLSX from 'xlsx';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ChatOpenAI } from '@langchain/openai';
-import { DynamicTool } from '@langchain/core/tools';
-import { AgentExecutor, createOpenAIFunctionsAgent } from '@langchain/agents';
-import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
-import { AIMessage, HumanMessage } from '@langchain/core/messages';
+import OpenAI from 'openai';
 
 dotenv.config();
 
@@ -47,8 +43,7 @@ const logger = winston.createLogger({
     })
   ),
   transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'agent.log', level: 'error' })
+    new winston.transports.Console()
   ]
 });
 
@@ -147,236 +142,393 @@ async function initDatabase() {
 // ==================== ADVANCED AI AGENT CLASS ====================
 class AdvancedAIAgent {
   constructor() {
-    this.llm = new ChatOpenAI({
-      modelName: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      temperature: parseFloat(process.env.AGENT_TEMPERATURE) || 0.7,
-      maxTokens: parseInt(process.env.MAX_TOKENS) || 2000,
-      openAIApiKey: process.env.OPENAI_API_KEY
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
     });
-
-    this.tools = [];
-    this.agent = null;
-    this.executor = null;
+    
+    this.model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    this.temperature = parseFloat(process.env.AGENT_TEMPERATURE) || 0.7;
+    this.maxTokens = parseInt(process.env.MAX_TOKENS) || 2000;
+    
     this.conversationHistory = new Map();
     this.activeConnections = new Map();
+    this.tools = this.initializeTools();
     
-    this.initializeTools();
-    this.initializeAgent();
+    logger.info('AI Agent initialized successfully');
   }
 
   initializeTools() {
-    // JavaScript Code Execution Tool
-    this.tools.push(new DynamicTool({
-      name: "execute_javascript",
-      description: "Execute JavaScript code safely in a sandboxed environment. Returns the result or error.",
-      func: async (code) => {
-        try {
-          const vm = new NodeVM({
-            timeout: 10000,
-            sandbox: {
-              console: {
-                log: (...args) => args.join(' '),
-                error: (...args) => args.join(' '),
-                warn: (...args) => args.join(' ')
-              },
-              Math,
-              Date,
-              JSON,
-              Array,
-              Object,
-              String,
-              Number,
-              Boolean,
-              RegExp
-            },
-            require: {
-              external: false,
-              builtin: ['crypto', 'util']
+    return {
+      execute_javascript: {
+        name: "execute_javascript",
+        description: "Execute JavaScript code safely in a sandboxed environment. Returns the result or error.",
+        parameters: {
+          type: "object",
+          properties: {
+            code: {
+              type: "string",
+              description: "The JavaScript code to execute"
             }
-          });
-
-          const result = await vm.run(`
-            (async function() {
-              ${code}
-            })()
-          `);
-
-          return typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
-        } catch (error) {
-          return `Execution Error: ${error.message}`;
+          },
+          required: ["code"]
+        }
+      },
+      
+      execute_python: {
+        name: "execute_python",
+        description: "Execute Python code (simulated). For complex calculations, data analysis, or scientific computing.",
+        parameters: {
+          type: "object",
+          properties: {
+            code: {
+              type: "string",
+              description: "The Python code to execute"
+            }
+          },
+          required: ["code"]
+        }
+      },
+      
+      Web Search: {
+        name: "Web Search",
+        description: "Search the web for current information. Use this for recent events, news, or when you need up-to-date information.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "The search query"
+            }
+          },
+          required: ["query"]
+        }
+      },
+      
+      save_memory: {
+        name: "save_memory",
+        description: "Save information to long-term memory.",
+        parameters: {
+          type: "object",
+          properties: {
+            key: {
+              type: "string",
+              description: "The key to store the information under"
+            },
+            value: {
+              type: "string",
+              description: "The value to store"
+            },
+            category: {
+              type: "string",
+              description: "The category for organization (optional)",
+              default: "general"
+            }
+          },
+          required: ["key", "value"]
+        }
+      },
+      
+      recall_memory: {
+        name: "recall_memory",
+        description: "Recall information from long-term memory.",
+        parameters: {
+          type: "object",
+          properties: {
+            key: {
+              type: "string",
+              description: "The key to retrieve information for"
+            },
+            category: {
+              type: "string",
+              description: "The category to search in (optional)"
+            }
+          },
+          required: ["key"]
+        }
+      },
+      
+      create_file: {
+        name: "create_file",
+        description: "Create a file with specified content.",
+        parameters: {
+          type: "object",
+          properties: {
+            filename: {
+              type: "string",
+              description: "The name of the file to create"
+            },
+            content: {
+              type: "string",
+              description: "The content to write to the file"
+            },
+            type: {
+              type: "string",
+              description: "The file type (text, json, csv, etc.)",
+              default: "text"
+            }
+          },
+          required: ["filename", "content"]
+        }
+      },
+      
+      read_file: {
+        name: "read_file",
+        description: "Read content from a file.",
+        parameters: {
+          type: "object",
+          properties: {
+            filename: {
+              type: "string",
+              description: "The name of the file to read"
+            }
+          },
+          required: ["filename"]
+        }
+      },
+      
+      system_info: {
+        name: "system_info",
+        description: "Get system information including memory usage, uptime, and environment details.",
+        parameters: {
+          type: "object",
+          properties: {},
+          required: []
+        }
+      },
+      
+      schedule_task: {
+        name: "schedule_task",
+        description: "Schedule a task to run later.",
+        parameters: {
+          type: "object",
+          properties: {
+            task_type: {
+              type: "string",
+              description: "The type of task to schedule"
+            },
+            task_data: {
+              type: "string",
+              description: "The data for the task"
+            },
+            schedule_time: {
+              type: "string",
+              description: "When to run the task (ISO format or 'now')"
+            }
+          },
+          required: ["task_type", "task_data", "schedule_time"]
         }
       }
-    }));
+    };
+  }
 
-    // Python Code Execution Tool (simulated)
-    this.tools.push(new DynamicTool({
-      name: "execute_python",
-      description: "Execute Python code (simulated). For complex calculations, data analysis, or scientific computing.",
-      func: async (code) => {
-        // This is a simulation - in production, you'd use a Python execution service
-        try {
-          // Simple Python-like operations simulation
-          if (code.includes('import numpy') || code.includes('import pandas')) {
-            return "Python libraries like numpy/pandas are available. Code executed successfully.";
-          }
+  async executeFunction(functionName, parameters) {
+    try {
+      switch (functionName) {
+        case 'execute_javascript':
+          return await this.executeJavaScript(parameters.code);
           
-          // Basic math operations
-          const mathOperations = code.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/g);
-          if (mathOperations) {
-            const results = mathOperations.map(op => {
-              const [, a, operator, b] = op.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/);
-              const numA = parseFloat(a);
-              const numB = parseFloat(b);
-              switch (operator) {
-                case '+': return numA + numB;
-                case '-': return numA - numB;
-                case '*': return numA * numB;
-                case '/': return numA / numB;
-                default: return 'Unknown operation';
-              }
-            });
-            return `Python execution result: ${results.join(', ')}`;
-          }
+        case 'execute_python':
+          return await this.executePython(parameters.code);
           
-          return "Python code executed successfully (simulated)";
-        } catch (error) {
-          return `Python Execution Error: ${error.message}`;
-        }
+        case 'Web Search':
+          return await this.webSearch(parameters.query);
+          
+        case 'save_memory':
+          return await this.saveMemory(parameters.key, parameters.value, parameters.category);
+          
+        case 'recall_memory':
+          return await this.recallMemory(parameters.key, parameters.category);
+          
+        case 'create_file':
+          return await this.createFile(parameters.filename, parameters.content, parameters.type);
+          
+        case 'read_file':
+          return await this.readFile(parameters.filename);
+          
+        case 'system_info':
+          return await this.getSystemInfo();
+          
+        case 'schedule_task':
+          return await this.scheduleTask(parameters.task_type, parameters.task_data, parameters.schedule_time);
+          
+        default:
+          return `Unknown function: ${functionName}`;
       }
-    }));
+    } catch (error) {
+      return `Function execution error: ${error.message}`;
+    }
+  }
 
-    // Web Search Tool
-    this.tools.push(new DynamicTool({
-      name: "Web Search",
-      description: "Search the web for current information. Use this for recent events, news, or when you need up-to-date information.",
-      func: async (query) => {
-        try {
-          // Using DuckDuckGo Instant Answer API (free, no API key required)
-          const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
-          
-          if (response.data.AbstractText) {
-            return response.data.AbstractText;
-          }
-          
-          if (response.data.RelatedTopics && response.data.RelatedTopics.length > 0) {
-            return response.data.RelatedTopics.slice(0, 3).map(topic => topic.Text).join('\n\n');
-          }
-          
-          return `Search completed for "${query}" but no specific results found. Try a more specific query.`;
-        } catch (error) {
-          return `Web search error: ${error.message}`;
+  async executeJavaScript(code) {
+    try {
+      const vm = new NodeVM({
+        timeout: 10000,
+        sandbox: {
+          console: {
+            log: (...args) => args.join(' '),
+            error: (...args) => args.join(' '),
+            warn: (...args) => args.join(' ')
+          },
+          Math,
+          Date,
+          JSON,
+          Array,
+          Object,
+          String,
+          Number,
+          Boolean,
+          RegExp
+        },
+        require: {
+          external: false,
+          builtin: ['crypto', 'util']
         }
-      }
-    }));
+      });
 
-    // Memory Management Tools
-    this.tools.push(new DynamicTool({
-      name: "save_memory",
-      description: "Save information to long-term memory. Use format: key|value|category (category is optional)",
-      func: async (input) => {
-        if (!pool) return "Memory storage not available";
-        
-        try {
-          const [key, value, category = 'general'] = input.split('|');
-          const userId = 1; // Default user - in production, get from context
-          
-          await pool.query(`
-            INSERT INTO agent_memory (user_id, key, value, category, updated_at)
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-            ON CONFLICT (user_id, key, category)
-            DO UPDATE SET value = $3, updated_at = CURRENT_TIMESTAMP
-          `, [userId, key.trim(), value.trim(), category.trim()]);
-          
-          return `Memory saved: ${key} = ${value} (category: ${category})`;
-        } catch (error) {
-          return `Memory save error: ${error.message}`;
-        }
-      }
-    }));
+      const result = await vm.run(`
+        (async function() {
+          ${code}
+        })()
+      `);
 
-    this.tools.push(new DynamicTool({
-      name: "recall_memory",
-      description: "Recall information from long-term memory. Provide key and optionally category separated by |",
-      func: async (input) => {
-        if (!pool) return "Memory storage not available";
-        
-        try {
-          const [key, category] = input.split('|');
-          const userId = 1; // Default user
-          
-          let query = 'SELECT key, value, category, updated_at FROM agent_memory WHERE user_id = $1 AND key = $2';
-          let params = [userId, key.trim()];
-          
-          if (category) {
-            query += ' AND category = $3';
-            params.push(category.trim());
+      return typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+    } catch (error) {
+      return `JavaScript Execution Error: ${error.message}`;
+    }
+  }
+
+  async executePython(code) {
+    try {
+      // Python simulation - in production, you'd use a Python execution service
+      if (code.includes('import numpy') || code.includes('import pandas')) {
+        return "Python libraries like numpy/pandas are available. Code executed successfully.";
+      }
+      
+      // Basic math operations simulation
+      const mathOperations = code.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/g);
+      if (mathOperations) {
+        const results = mathOperations.map(op => {
+          const [, a, operator, b] = op.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/);
+          const numA = parseFloat(a);
+          const numB = parseFloat(b);
+          switch (operator) {
+            case '+': return numA + numB;
+            case '-': return numA - numB;
+            case '*': return numA * numB;
+            case '/': return numA / numB;
+            default: return 'Unknown operation';
           }
-          
-          const result = await pool.query(query, params);
-          
-          if (result.rows.length === 0) {
-            return `No memory found for key: ${key}`;
-          }
-          
-          return result.rows.map(row => 
-            `${row.key}: ${row.value} (category: ${row.category}, updated: ${row.updated_at})`
-          ).join('\n');
-        } catch (error) {
-          return `Memory recall error: ${error.message}`;
-        }
+        });
+        return `Python execution result: ${results.join(', ')}`;
       }
-    }));
+      
+      return "Python code executed successfully (simulated)";
+    } catch (error) {
+      return `Python Execution Error: ${error.message}`;
+    }
+  }
 
-    // File Operations Tool
-    this.tools.push(new DynamicTool({
-      name: "create_file",
-      description: "Create a file with specified content. Format: filename|content|type (type: text, json, csv, etc.)",
-      func: async (input) => {
-        try {
-          const [filename, content, type = 'text'] = input.split('|');
-          const uploadsDir = path.join(__dirname, 'uploads');
-          
-          // Ensure uploads directory exists
-          try {
-            await fs.access(uploadsDir);
-          } catch {
-            await fs.mkdir(uploadsDir, { recursive: true });
-          }
-          
-          const filePath = path.join(uploadsDir, filename.trim());
-          await fs.writeFile(filePath, content.trim(), 'utf8');
-          
-          return `File created successfully: ${filename} (${content.length} characters)`;
-        } catch (error) {
-          return `File creation error: ${error.message}`;
-        }
+  async webSearch(query) {
+    try {
+      // Using DuckDuckGo Instant Answer API
+      const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+      
+      if (response.data.AbstractText) {
+        return response.data.AbstractText;
       }
-    }));
-
-    this.tools.push(new DynamicTool({
-      name: "read_file",
-      description: "Read content from a file. Provide filename.",
-      func: async (filename) => {
-        try {
-          const filePath = path.join(__dirname, 'uploads', filename.trim());
-          const content = await fs.readFile(filePath, 'utf8');
-          return content.length > 2000 ? content.substring(0, 2000) + '...[truncated]' : content;
-        } catch (error) {
-          return `File read error: ${error.message}`;
-        }
+      
+      if (response.data.RelatedTopics && response.data.RelatedTopics.length > 0) {
+        return response.data.RelatedTopics.slice(0, 3).map(topic => topic.Text).join('\n\n');
       }
-    }));
+      
+      return `Search completed for "${query}" but no specific results found. Try a more specific query.`;
+    } catch (error) {
+      return `Web search error: ${error.message}`;
+    }
+  }
 
-    // System Information Tool
-    this.tools.push(new DynamicTool({
-      name: "system_info",
-      description: "Get system information including memory usage, uptime, and environment details.",
-      func: async () => {
-        try {
-          const memUsage = process.memoryUsage();
-          const uptime = process.uptime();
-          
-          return `System Information:
+  async saveMemory(key, value, category = 'general') {
+    if (!pool) return "Memory storage not available";
+    
+    try {
+      const userId = 1; // Default user
+      
+      await pool.query(`
+        INSERT INTO agent_memory (user_id, key, value, category, updated_at)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, key, category)
+        DO UPDATE SET value = $3, updated_at = CURRENT_TIMESTAMP
+      `, [userId, key, value, category]);
+      
+      return `Memory saved: ${key} = ${value} (category: ${category})`;
+    } catch (error) {
+      return `Memory save error: ${error.message}`;
+    }
+  }
+
+  async recallMemory(key, category) {
+    if (!pool) return "Memory storage not available";
+    
+    try {
+      const userId = 1; // Default user
+      
+      let query = 'SELECT key, value, category, updated_at FROM agent_memory WHERE user_id = $1 AND key = $2';
+      let params = [userId, key];
+      
+      if (category) {
+        query += ' AND category = $3';
+        params.push(category);
+      }
+      
+      const result = await pool.query(query, params);
+      
+      if (result.rows.length === 0) {
+        return `No memory found for key: ${key}`;
+      }
+      
+      return result.rows.map(row => 
+        `${row.key}: ${row.value} (category: ${row.category}, updated: ${row.updated_at})`
+      ).join('\n');
+    } catch (error) {
+      return `Memory recall error: ${error.message}`;
+    }
+  }
+
+  async createFile(filename, content, type = 'text') {
+    try {
+      const uploadsDir = path.join(__dirname, 'uploads');
+      
+      try {
+        await fs.access(uploadsDir);
+      } catch {
+        await fs.mkdir(uploadsDir, { recursive: true });
+      }
+      
+      const filePath = path.join(uploadsDir, filename);
+      await fs.writeFile(filePath, content, 'utf8');
+      
+      return `File created successfully: ${filename} (${content.length} characters)`;
+    } catch (error) {
+      return `File creation error: ${error.message}`;
+    }
+  }
+
+  async readFile(filename) {
+    try {
+      const filePath = path.join(__dirname, 'uploads', filename);
+      const content = await fs.readFile(filePath, 'utf8');
+      return content.length > 2000 ? content.substring(0, 2000) + '...[truncated]' : content;
+    } catch (error) {
+      return `File read error: ${error.message}`;
+    }
+  }
+
+  async getSystemInfo() {
+    try {
+      const memUsage = process.memoryUsage();
+      const uptime = process.uptime();
+      
+      return `System Information:
 - Node.js Version: ${process.version}
 - Platform: ${process.platform}
 - Architecture: ${process.arch}
@@ -387,44 +539,42 @@ class AdvancedAIAgent {
   - Heap Total: ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB
 - Environment: ${process.env.NODE_ENV || 'development'}
 - Database: ${pool ? 'Connected' : 'Not connected'}`;
-        } catch (error) {
-          return `System info error: ${error.message}`;
-        }
-      }
-    }));
-
-    // Task Scheduler Tool
-    this.tools.push(new DynamicTool({
-      name: "schedule_task",
-      description: "Schedule a task to run later. Format: task_type|task_data|schedule_time (ISO format or 'now')",
-      func: async (input) => {
-        if (!pool) return "Task scheduling not available";
-        
-        try {
-          const [taskType, taskData, scheduleTime] = input.split('|');
-          const userId = 1; // Default user
-          const scheduledAt = scheduleTime === 'now' ? new Date() : new Date(scheduleTime);
-          
-          const result = await pool.query(`
-            INSERT INTO agent_tasks (user_id, task_type, task_data, scheduled_at)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id
-          `, [userId, taskType.trim(), JSON.stringify({ data: taskData.trim() }), scheduledAt]);
-          
-          return `Task scheduled with ID: ${result.rows[0].id} for ${scheduledAt.toISOString()}`;
-        } catch (error) {
-          return `Task scheduling error: ${error.message}`;
-        }
-      }
-    }));
-
-    logger.info(`Initialized ${this.tools.length} tools for the AI agent`);
+    } catch (error) {
+      return `System info error: ${error.message}`;
+    }
   }
 
-  async initializeAgent() {
+  async scheduleTask(taskType, taskData, scheduleTime) {
+    if (!pool) return "Task scheduling not available";
+    
     try {
-      const prompt = ChatPromptTemplate.fromMessages([
-        ["system", `You are an advanced AI agent with the following capabilities:
+      const userId = 1; // Default user
+      const scheduledAt = scheduleTime === 'now' ? new Date() : new Date(scheduleTime);
+      
+      const result = await pool.query(`
+        INSERT INTO agent_tasks (user_id, task_type, task_data, scheduled_at)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
+      `, [userId, taskType, JSON.stringify({ data: taskData }), scheduledAt]);
+      
+      return `Task scheduled with ID: ${result.rows[0].id} for ${scheduledAt.toISOString()}`;
+    } catch (error) {
+      return `Task scheduling error: ${error.message}`;
+    }
+  }
+
+  async processMessage(message, userId = 'anonymous', sessionId = null) {
+    const startTime = Date.now();
+    
+    try {
+      // Get conversation history for context
+      const history = this.conversationHistory.get(sessionId) || [];
+      
+      // Prepare messages for OpenAI
+      const messages = [
+        {
+          role: "system",
+          content: `You are an advanced AI agent with the following capabilities:
 
 CORE IDENTITY:
 - You are a highly intelligent, autonomous AI agent running on Railway
@@ -433,7 +583,7 @@ CORE IDENTITY:
 - You can schedule tasks, manage data, and perform complex operations
 - You are designed to be helpful, accurate, and efficient
 
-AVAILABLE TOOLS:
+AVAILABLE FUNCTIONS:
 - execute_javascript: Run JavaScript code in a secure sandbox
 - execute_python: Run Python code for data analysis and scientific computing
 - Web Search: Search the internet for current information
@@ -444,7 +594,7 @@ AVAILABLE TOOLS:
 
 BEHAVIOR GUIDELINES:
 - Always think step by step before taking actions
-- Use tools when they would be helpful to answer questions or solve problems
+- Use functions when they would be helpful to answer questions or solve problems
 - Explain your reasoning and what you're doing
 - Be proactive in suggesting solutions and improvements
 - Maintain context and remember important information
@@ -460,48 +610,63 @@ CAPABILITIES:
 - Memory management and learning from interactions
 - System monitoring and optimization
 
-Remember: You are not just a chatbot, you are a capable AI agent that can take actions and solve real problems.`],
-        ["human", "{input}"],
-        new MessagesPlaceholder("agent_scratchpad")
-      ]);
+Remember: You are not just a chatbot, you are a capable AI agent that can take actions and solve real problems.`
+        },
+        ...history,
+        {
+          role: "user",
+          content: message
+        }
+      ];
 
-      this.agent = await createOpenAIFunctionsAgent({
-        llm: this.llm,
-        tools: this.tools,
-        prompt
+      // Call OpenAI with function calling
+      const response = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: messages,
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
+        functions: Object.values(this.tools),
+        function_call: "auto"
       });
 
-      this.executor = new AgentExecutor({
-        agent: this.agent,
-        tools: this.tools,
-        verbose: process.env.AGENT_VERBOSE === 'true',
-        maxIterations: parseInt(process.env.MAX_ITERATIONS) || 10,
-        returnIntermediateSteps: true
-      });
+      const assistantMessage = response.choices[0].message;
+      let finalResponse = assistantMessage.content || "";
+      let functionResults = [];
 
-      logger.info('AI Agent initialized successfully');
-    } catch (error) {
-      logger.error('Agent initialization error:', error);
-      throw error;
-    }
-  }
-
-  async processMessage(message, userId = 'anonymous', sessionId = null) {
-    const startTime = Date.now();
-    
-    try {
-      // Get conversation history for context
-      const history = this.conversationHistory.get(sessionId) || [];
-      
-      // Execute the agent
-      const result = await this.executor.invoke({
-        input: message,
-        chat_history: history
-      });
+      // Handle function calls
+      if (assistantMessage.function_call) {
+        const functionName = assistantMessage.function_call.name;
+        const functionArgs = JSON.parse(assistantMessage.function_call.arguments);
+        
+        logger.info(`Executing function: ${functionName} with args:`, functionArgs);
+        
+        const functionResult = await this.executeFunction(functionName, functionArgs);
+        functionResults.push({ function: functionName, result: functionResult });
+        
+        // Get final response after function execution
+        const followUpMessages = [
+          ...messages,
+          assistantMessage,
+          {
+            role: "function",
+            name: functionName,
+            content: functionResult
+          }
+        ];
+        
+        const followUpResponse = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: followUpMessages,
+          temperature: this.temperature,
+          max_tokens: this.maxTokens
+        });
+        
+        finalResponse = followUpResponse.choices[0].message.content;
+      }
 
       // Update conversation history
-      history.push(new HumanMessage(message));
-      history.push(new AIMessage(result.output));
+      history.push({ role: "user", content: message });
+      history.push({ role: "assistant", content: finalResponse });
       
       // Keep only last 10 messages for context
       if (history.length > 20) {
@@ -520,12 +685,12 @@ Remember: You are not just a chatbot, you are a capable AI agent that can take a
             userId === 'anonymous' ? null : userId,
             sessionId,
             message,
-            result.output,
+            finalResponse,
             JSON.stringify({
-              intermediateSteps: result.intermediateSteps?.length || 0,
-              toolsUsed: result.intermediateSteps?.map(step => step.action?.tool) || []
+              functionsUsed: functionResults.map(f => f.function),
+              functionResults: functionResults
             }),
-            0, // Token counting would require additional implementation
+            response.usage?.total_tokens || 0,
             Date.now() - startTime
           ]);
         } catch (dbError) {
@@ -534,10 +699,11 @@ Remember: You are not just a chatbot, you are a capable AI agent that can take a
       }
 
       return {
-        response: result.output,
-        intermediateSteps: result.intermediateSteps,
+        response: finalResponse,
+        functionResults: functionResults,
         executionTime: Date.now() - startTime,
-        sessionId
+        sessionId,
+        tokensUsed: response.usage?.total_tokens || 0
       };
 
     } catch (error) {
@@ -627,7 +793,7 @@ app.get('/health', async (req, res) => {
       database: dbStatus,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
-      version: process.env.npm_package_version || '1.0.0'
+      version: '2.0.0'
     });
   } catch (error) {
     res.status(500).json({
@@ -794,6 +960,7 @@ app.get('/api/stats', async (req, res) => {
 
 // Advanced web interface
 app.get('/', (req, res) => {
+  const sessionId = uuidv4();
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1030,7 +1197,7 @@ app.get('/', (req, res) => {
         
         <div class="status-bar">
             <span id="statusText">Ready</span>
-            <span id="sessionId">Session: ${uuidv4().substring(0, 8)}</span>
+            <span id="sessionId">Session: ${sessionId.substring(0, 8)}</span>
         </div>
     </div>
 
@@ -1042,7 +1209,7 @@ app.get('/', (req, res) => {
         const statusText = document.getElementById('statusText');
         const fileUpload = document.getElementById('fileUpload');
         
-        const sessionId = '${uuidv4()}';
+        const sessionId = '${sessionId}';
         let isProcessing = false;
 
         // Auto-resize textarea
@@ -1130,7 +1297,7 @@ app.get('/', (req, res) => {
 
                 if (result.success) {
                     addMessage(result.response, 'agent');
-                    statusText.textContent = \`Response in \${result.executionTime}ms\`;
+                    statusText.textContent = \`Response in \${result.executionTime}ms (\${result.tokensUsed} tokens)\`;
                 } else {
                     addMessage(\`Error: \${result.error}\`, 'agent');
                     statusText.textContent = 'Error occurred';
@@ -1307,9 +1474,9 @@ async function startServer() {
     
     server.listen(PORT, () => {
       logger.info(`🚀 Advanced AI Agent server running on port ${PORT}`);
-      logger.info(`🌐 Web interface: http://localhost:${PORT}`);
-      logger.info(`🔌 WebSocket endpoint: ws://localhost:${PORT}`);
-      logger.info(`📡 API endpoint: http://localhost:${PORT}/api/chat`);
+      logger.info(`🌐 Web interface available`);
+      logger.info(`🔌 WebSocket endpoint available`);
+      logger.info(`📡 API endpoint: /api/chat`);
     });
     
   } catch (error) {
