@@ -1,49 +1,49 @@
-> node index.js
-
- 
-
-node:internal/modules/esm/resolve:838
-
-  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
-
-        ^
-
- 
-
-Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@langchain/agents' imported from /app/index.js
-
-    at packageResolve (node:internal/modules/esm/resolve:838:9)
-
-    at moduleResolve (node:internal/modules/esm/resolve:907:18)
-
-    at defaultResolve (node:internal/modules/esm/resolve:1037:11)
-
-    at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:650:12)
-
-    at #cachedDefaultResolve (node:internal/modules/esm/loader:599:25)
-
-    at ModuleLoader.resolve (node:internal/modules/esm/loader:582:38)
-
-    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:241:38)
-
-    at ModuleJob._link (node:internal/modules/esm/module_job:132:49) {
-
-  code: 'ERR_MODULE_NOT_FOUND'
-
+{
+  "name": "railway-advanced-ai-agent",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Advanced AI Agent with code execution, memory, and web interface",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "openai": "^4.28.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "pg": "^8.11.3",
+    "vm2": "^3.9.19",
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "node-cron": "^3.0.3",
+    "ws": "^8.14.2",
+    "uuid": "^9.0.1",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.32.6",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0",
+    "csv-parser": "^3.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "openai",
+    "railway",
+    "chatbot",
+    "automation"
+  ],
+  "author": "Advanced AI Agent",
+  "license": "MIT"
 }
-
- 
-
-Node.js v22.11.0
-
-Stopping Container
-
-npm error path /app
-
-npm error command failed
-
-npm error signal SIGTERM
-
-npm error command sh -c node index.js
-
-npm error A complete log of this run can be found in: /root/.npm/_logs/2025-06-28T18_42_33_276Z-debug-0.log
