@@ -17,7 +17,6 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
-import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
 import csv from 'csv-parser';
 import XLSX from 'xlsx';
@@ -25,6 +24,16 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
+
+// PDF-parse'ı dinamik olarak import et
+let pdf;
+try {
+  const pdfModule = await import('pdf-parse');
+  pdf = pdfModule.default;
+} catch (error) {
+  console.warn('PDF parsing not available:', error.message);
+  pdf = null;
+}
 
 dotenv.config();
 
@@ -496,7 +505,7 @@ class AdvancedAIAgent {
 
   async createFile(filename, content, type = 'text') {
     try {
-      const uploadsDir = path.join(__dirname, 'Uploads');
+      const uploadsDir = path.join(__dirname, 'uploads');
       
       try {
         await fs.access(uploadsDir);
@@ -515,7 +524,7 @@ class AdvancedAIAgent {
 
   async readFile(filename) {
     try {
-      const filePath = path.join(__dirname, 'Uploads', filename);
+      const filePath = path.join(__dirname, 'uploads', filename);
       const content = await fs.readFile(filePath, 'utf8');
       return content.length > 2000 ? content.substring(0, 2000) + '...[truncated]' : content;
     } catch (error) {
@@ -538,7 +547,8 @@ class AdvancedAIAgent {
   - Heap Used: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB
   - Heap Total: ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB
 - Environment: ${process.env.NODE_ENV || 'development'}
-- Database: ${pool ? 'Connected' : 'Not connected'}`;
+- Database: ${pool ? 'Connected' : 'Not connected'}
+- PDF Support: ${pdf ? 'Available' : 'Not available'}`;
     } catch (error) {
       return `System info error: ${error.message}`;
     }
@@ -793,7 +803,8 @@ app.get('/health', async (req, res) => {
       database: dbStatus,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
-      version: '2.0.0'
+      version: '2.0.0',
+      pdfSupport: pdf ? 'available' : 'not available'
     });
   } catch (error) {
     res.status(500).json({
@@ -858,22 +869,36 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     
     if (req.file.mimetype.startsWith('text/')) {
       processedContent = await fs.readFile(req.file.path, 'utf8');
-    } else if (req.file.mimetype === 'application/pdf') {
-      const dataBuffer = await fs.readFile(req.file.path);
-      const pdfData = await pdf(dataBuffer);
-      processedContent = pdfData.text;
+    } else if (req.file.mimetype === 'application/pdf' && pdf) {
+      try {
+        const dataBuffer = await fs.readFile(req.file.path);
+        const pdfData = await pdf(dataBuffer);
+        processedContent = pdfData.text;
+      } catch (pdfError) {
+        logger.warn('PDF processing failed:', pdfError.message);
+        processedContent = 'PDF file uploaded but could not be processed for text extraction.';
+      }
     } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      const dataBuffer = await fs.readFile(req.file.path);
-      const result = await mammoth.extractRawText({ buffer: dataBuffer });
-      processedContent = result.value;
+      try {
+        const dataBuffer = await fs.readFile(req.file.path);
+        const result = await mammoth.extractRawText({ buffer: dataBuffer });
+        processedContent = result.value;
+      } catch (docxError) {
+        logger.warn('DOCX processing failed:', docxError.message);
+        processedContent = 'DOCX file uploaded but could not be processed for text extraction.';
+      }
     }
     
     // Save file info to database
     if (pool) {
-      await pool.query(`
-        INSERT INTO files (user_id, filename, original_name, file_type, file_size, file_path, processed)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [1, req.file.filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.path, true]);
+      try {
+        await pool.query(`
+          INSERT INTO files (user_id, filename, original_name, file_type, file_size, file_path, processed)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [1, req.file.filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.path, true]);
+      } catch (dbError) {
+        logger.warn('Failed to save file info to database:', dbError.message);
+      }
     }
     
     res.json({
@@ -929,19 +954,25 @@ app.get('/api/stats', async (req, res) => {
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       activeConnections: agent.activeConnections.size,
-      conversationSessions: agent.conversationHistory.size
+      conversationSessions: agent.conversationHistory.size,
+      pdfSupport: pdf ? 'available' : 'not available'
     };
     
     if (pool) {
-      const conversationCount = await pool.query('SELECT COUNT(*) as count FROM conversations');
-      const userCount = await pool.query('SELECT COUNT(*) as count FROM users');
-      const memoryCount = await pool.query('SELECT COUNT(*) as count FROM agent_memory');
-      
-      stats.database = {
-        conversations: parseInt(conversationCount.rows[0].count),
-        users: parseInt(userCount.rows[0].count),
-        memories: parseInt(memoryCount.rows[0].count)
-      };
+      try {
+        const conversationCount = await pool.query('SELECT COUNT(*) as count FROM conversations');
+        const userCount = await pool.query('SELECT COUNT(*) as count FROM users');
+        const memoryCount = await pool.query('SELECT COUNT(*) as count FROM agent_memory');
+        
+        stats.database = {
+          conversations: parseInt(conversationCount.rows[0].count),
+          users: parseInt(userCount.rows[0].count),
+          memories: parseInt(memoryCount.rows[0].count)
+        };
+      } catch (dbError) {
+        logger.warn('Failed to get database stats:', dbError.message);
+        stats.database = { error: 'Database query failed' };
+      }
     }
     
     res.json({
@@ -1477,6 +1508,7 @@ async function startServer() {
       logger.info(`🌐 Web interface available`);
       logger.info(`🔌 WebSocket endpoint available`);
       logger.info(`📡 API endpoint: /api/chat`);
+      logger.info(`📄 PDF Support: ${pdf ? 'Available' : 'Not available'}`);
     });
     
   } catch (error) {
