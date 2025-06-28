@@ -379,6 +379,9 @@ app.use((req, res, next) => {
 });
 
 // Routes
+app.get('/', (req, res) => {
+  res.send('AI API çalışıyor!');
+});
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
