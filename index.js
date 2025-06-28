@@ -189,7 +189,7 @@ class AdvancedAIAgent {
         }
       },
       
-      Web Search: {
+      "Web Search": {
         name: "Web Search",
         description: "Search the web for current information. Use this for recent events, news, or when you need up-to-date information.",
         parameters: {
@@ -496,7 +496,7 @@ class AdvancedAIAgent {
 
   async createFile(filename, content, type = 'text') {
     try {
-      const uploadsDir = path.join(__dirname, 'uploads');
+      const uploadsDir = path.join(__dirname, 'Uploads');
       
       try {
         await fs.access(uploadsDir);
@@ -515,7 +515,7 @@ class AdvancedAIAgent {
 
   async readFile(filename) {
     try {
-      const filePath = path.join(__dirname, 'uploads', filename);
+      const filePath = path.join(__dirname, 'Uploads', filename);
       const content = await fs.readFile(filePath, 'utf8');
       return content.length > 2000 ? content.substring(0, 2000) + '...[truncated]' : content;
     } catch (error) {
