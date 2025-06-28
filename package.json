@@ -1,12 +1,14 @@
 {
   "name": "advanced-personal-ai",
   "version": "2.0.0",
-  "description": "PostgreSQL destekli gelişmiş kişisel AI asistanı",
+  "description": "Gelişmiş Kişisel AI Sistemi",
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "compression": "^1.7.4",
@@ -15,10 +17,7 @@
     "express-rate-limit": "^6.7.0",
     "helmet": "^7.0.0",
     "natural": "^6.5.0",
-    "pg": "^8.11.0",
-    "winston": "^3.8.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "pg": "^8.11.3",
+    "winston": "^3.10.0"
   }
 }
