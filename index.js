@@ -1,4 +1,3 @@
-# Tam index.js dosyası oluştur
 index_js_content = '''import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
