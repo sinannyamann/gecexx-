@@ -43,12 +43,10 @@ class AdvancedPersonalAI extends EventEmitter {
   }
 
   initializeNLP() {
-    this.stemmer = natural.PorterStemmerTr || natural.PorterStemmer;
-    this.tokenizer = new natural.WordTokenizer();
-    this.sentiment = new natural.SentimentAnalyzer('Turkish', 
-      natural.PorterStemmerTr || natural.PorterStemmer, ['negation']);
-    logger.info('NLP modülleri başlatıldı');
-  }
+  this.stemmer = natural.PorterStemmerTr || natural.PorterStemmer;
+  this.tokenizer = new natural.WordTokenizer();
+  logger.info('NLP modülleri başlatıldı');
+}
   async initializeDatabase() {
     try {
       // Kullanıcı profilleri
