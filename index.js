@@ -574,3 +574,190 @@ async saveConversation(userId, message, response, analysis) {
     }
   }
 }
+// Express App Setup
+const app = express();
+const ai = new AdvancedPersonalAI();
+
+// Railway için trust proxy
+app.set('trust proxy', 1);
+
+// Middleware
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(compression());
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Çok fazla istek. Lütfen bekleyin.' }
+});
+app.use(limiter);
+
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  req.requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.info(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+  });
+  
+  next();
+});
+
+// Routes - WEB ARAYÜZÜ İLE
+app.get('/', (req, res) => {
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Kişisel AI Sohbet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background: #f5f6fa; font-family: Arial, sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .container { max-width: 500px; width: 90%; margin: 20px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); padding: 24px; display: flex; flex-direction: column; min-height: 400px; }
+    h2 { text-align: center; color: #333; margin-bottom: 20px; }
+    .messages { flex-grow: 1; overflow-y: auto; margin-bottom: 16px; padding-right: 10px; }
+    .msg { margin: 8px 0; padding: 10px 15px; border-radius: 8px; max-width: 80%; word-wrap: break-word; }
+    .msg.user { background: #e0f2f7; color: #2d8cf0; margin-left: auto; text-align: right; }
+    .msg.ai { background: #f0f0f0; color: #222; margin-right: auto; text-align: left; }
+    .input-row { display: flex; gap: 8px; margin-top: auto; }
+    input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; transition: border-color 0.2s; }
+    input[type="text"]:focus { border-color: #2d8cf0; }
+    button { padding: 12px 20px; border-radius: 8px; border: none; background: #2d8cf0; color: #fff; font-weight: bold; cursor: pointer; font-size: 16px; transition: background-color 0.2s; }
+    button:hover { background: #2575d0; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🧠 Kişisel AI Sohbet</h2>
+    <div class="messages" id="messages"></div>
+    <form id="chatForm" class="input-row" autocomplete="off">
+      <input type="text" id="msgInput" placeholder="Mesajınızı yazın..." maxlength="1000" required />
+      <button type="submit">Gönder</button>
+    </form>
+  </div>
+  <script>
+    const messagesDiv = document.getElementById('messages');
+    const chatForm = document.getElementById('chatForm');
+    const msgInput = document.getElementById('msgInput');
+    const sendButton = chatForm.querySelector('button[type="submit"]');
+    const userId = 'webuser_' + Math.random().toString(36).substr(2, 8);
+
+    function addMsg(text, who) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + who;
+      div.textContent = text;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    chatForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const text = msgInput.value.trim();
+      if (!text) return;
+
+      addMsg(text, 'user');
+      msgInput.value = '';
+      sendButton.disabled = true;
+      addMsg('...', 'ai');
+
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, userId })
+        });
+        const data = await res.json();
+        messagesDiv.querySelector('.msg.ai:last-child').textContent = data.response || 'Bir hata oluştu.';
+      } catch (error) {
+        console.error('Fetch error:', error);
+        messagesDiv.querySelector('.msg.ai:last-child').textContent = 'Sunucuya ulaşılamıyor.';
+      } finally {
+        sendButton.disabled = false;
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+    };
+
+    addMsg('Merhaba! Ben senin kişisel AI asistanınım. Nasıl yardımcı olabilirim?', 'ai');
+  </script>
+</body>
+</html>`);
+});
+
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    
+    res.json({
+      status: 'healthy',
+      timestamp: Date.now(),
+      database: 'connected',
+      system: await ai.getSystemStats()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: Date.now()
+    });
+  }
+});
+
+app.post('/chat', async (req, res) => {
+  try {
+    const { message, userId } = req.body;
+    
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({
+        error: 'Geçerli bir mesaj göndermelisin'
+      });
+    }
+    
+    if (message.length > 1000) {
+      return res.status(400).json({
+        error: 'Mesaj çok uzun (maksimum 1000 karakter)'
+      });
+    }
+    
+    const result = await ai.processMessage(message, userId || 'anonymous');
+    res.json(result);
+    
+  } catch (error) {
+    logger.error('Chat hatası:', error);
+    res.status(500).json({
+      error: 'Bir hata oluştu. Lütfen tekrar deneyin.'
+    });
+  }
+});
+
+app.get('/stats', async (req, res) => {
+  try {
+    const stats = await ai.getSystemStats();
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'İstatistikler alınamadı' });
+  }
+});
+
+// Server başlatma
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+  logger.info(`🧠 Gelişmiş AI Sistemi ${PORT} portunda çalışıyor`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM alındı, sistem kapatılıyor...');
+  server.close(() => {
+    pool.end();
+    logger.info('Sistem başarıyla kapatıldı');
+    process.exit(0);
+  });
+});
+
+export default app;
