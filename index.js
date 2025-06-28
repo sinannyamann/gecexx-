@@ -1,5 +1,4 @@
-# Düzeltilmiş index.js dosyasını oluştur
-index_js_content = '''import express from 'express';
+import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
@@ -11,10 +10,10 @@ import { EventEmitter } from 'events';
 class PersonalAI extends EventEmitter {
   constructor() {
     super();
-    this.memory = new Map(); // Kalıcı hafıza
-    this.userProfiles = new Map(); // Kullanıcı profilleri
-    this.conversationHistory = new Map(); // Konuşma geçmişi
-    this.learningData = []; // Öğrenme verisi
+    this.memory = new Map();
+    this.userProfiles = new Map();
+    this.conversationHistory = new Map();
+    this.learningData = [];
     this.personality = {
       responseStyle: 'friendly',
       learningRate: 0.1,
@@ -24,25 +23,14 @@ class PersonalAI extends EventEmitter {
     this.startTime = Date.now();
   }
 
-  // Gelişmiş mesaj işleme
   async processMessage(message, userId = 'default', context = {}) {
     try {
-      // Kullanıcı profili güncelle
       this.updateUserProfile(userId, message);
-      
-      // Konuşma geçmişine ekle
       this.addToHistory(userId, message);
-      
-      // Mesaj analizi
       const analysis = this.analyzeMessage(message);
-      
-      // Yanıt üret
       const response = await this.generateResponse(message, userId, analysis, context);
-      
-      // Öğrenme verisi kaydet
       this.recordLearning(userId, message, response, analysis);
       
-      // Kendini geliştirme kontrolü
       if (this.shouldSelfImprove()) {
         await this.improveSelf();
       }
@@ -70,7 +58,6 @@ class PersonalAI extends EventEmitter {
     }
   }
 
-  // Kullanıcı profili güncelleme
   updateUserProfile(userId, message) {
     if (!this.userProfiles.has(userId)) {
       this.userProfiles.set(userId, {
@@ -86,14 +73,12 @@ class PersonalAI extends EventEmitter {
     profile.messageCount++;
     profile.lastSeen = Date.now();
     
-    // Duygu analizi
     const sentiment = this.analyzeSentiment(message);
     profile.sentiment[sentiment]++;
   }
 
-  // Mesaj analizi
   analyzeMessage(message) {
-    const analysis = {
+    return {
       length: message.length,
       wordCount: message.split(' ').length,
       sentiment: this.analyzeSentiment(message),
@@ -101,11 +86,8 @@ class PersonalAI extends EventEmitter {
       keywords: this.extractKeywords(message),
       complexity: this.calculateComplexity(message)
     };
-    
-    return analysis;
   }
 
-  // Duygu analizi
   analyzeSentiment(message) {
     const positiveWords = ['iyi', 'güzel', 'harika', 'mükemmel', 'teşekkür', 'seviyorum', 'başarılı'];
     const negativeWords = ['kötü', 'berbat', 'sinir', 'problem', 'hata', 'üzgün', 'başarısız'];
@@ -123,7 +105,6 @@ class PersonalAI extends EventEmitter {
     return 'neutral';
   }
 
-  // Niyet çıkarma
   extractIntent(message) {
     const intents = {
       'question': ['nedir', 'nasıl', 'ne zaman', 'neden', 'kim', 'nerede'],
@@ -144,18 +125,16 @@ class PersonalAI extends EventEmitter {
     return 'general';
   }
 
-  // Anahtar kelime çıkarma
   extractKeywords(message) {
     const stopWords = ['ve', 'ile', 'bir', 'bu', 'şu', 'o', 'ben', 'sen'];
     const words = message.toLowerCase()
-      .replace(/[^\\w\\s]/g, '')
+      .replace(/[^\w\s]/g, '')
       .split(' ')
       .filter(word => word.length > 2 && !stopWords.includes(word));
     
     return [...new Set(words)].slice(0, 5);
   }
 
-  // Karmaşıklık hesaplama
   calculateComplexity(message) {
     const sentences = message.split(/[.!?]+/).length;
     const words = message.split(' ').length;
@@ -166,35 +145,27 @@ class PersonalAI extends EventEmitter {
     return 'simple';
   }
 
-  // Yanıt üretme
   async generateResponse(message, userId, analysis, context) {
     const userProfile = this.userProfiles.get(userId);
     const history = this.conversationHistory.get(userId) || [];
     
-    // Intent'e göre yanıt
     switch (analysis.intent) {
       case 'greeting':
         return this.generateGreeting(userProfile);
-      
       case 'question':
         return this.generateAnswer(message, analysis, history);
-      
       case 'request':
         return this.generateTaskResponse(message, analysis);
-      
       case 'self_improvement':
         await this.improveSelf();
         return "Kendimi geliştirdim! Yeni yetenekler kazandım.";
-      
       case 'farewell':
         return this.generateFarewell(userProfile);
-      
       default:
         return this.generateContextualResponse(message, analysis, userProfile, history);
     }
   }
 
-  // Selamlama üretme
   generateGreeting(userProfile) {
     const hour = new Date().getHours();
     let timeGreeting = 'Merhaba';
@@ -210,7 +181,6 @@ class PersonalAI extends EventEmitter {
     }
   }
 
-  // Soru yanıtlama
   generateAnswer(message, analysis, history) {
     if (message.toLowerCase().includes('kaç mesaj')) {
       return `Toplamda ${history.length} mesaj alışverişi yaptık.`;
@@ -228,7 +198,6 @@ class PersonalAI extends EventEmitter {
     return `Bu konuda düşünmem gerekiyor: "${message}". Daha fazla bilgi verebilir misin?`;
   }
 
-  // Görev yanıtı
   generateTaskResponse(message, analysis) {
     if (analysis.keywords.includes('kod')) {
       return "Kod yazma konusunda yardımcı olabilirim. Hangi dilde ve ne tür bir kod istiyorsun?";
@@ -241,18 +210,15 @@ class PersonalAI extends EventEmitter {
     return `"${message}" görevini anladım. Bu konuda elimden geleni yapacağım.`;
   }
 
-  // Bağlamsal yanıt
   generateContextualResponse(message, analysis, userProfile, history) {
     let response = `Mesajını aldım: "${message}"`;
     
-    // Duygu durumuna göre yanıt ayarla
     if (analysis.sentiment === 'positive') {
       response += " Pozitif enerjin beni de mutlu ediyor! 😊";
     } else if (analysis.sentiment === 'negative') {
       response += " Üzgün görünüyorsun. Nasıl yardımcı olabilirim?";
     }
     
-    // Karmaşıklığa göre yanıt
     if (analysis.complexity === 'complex') {
       response += " Karmaşık bir konu bu, detaylı düşünmem gerekiyor.";
     }
@@ -260,12 +226,10 @@ class PersonalAI extends EventEmitter {
     return response;
   }
 
-  // Veda
   generateFarewell(userProfile) {
     return `Hoşça kal! ${userProfile.messageCount} mesajlık sohbetimiz çok güzeldi. Tekrar görüşmek üzere!`;
   }
 
-  // Konuşma geçmişine ekleme
   addToHistory(userId, message) {
     if (!this.conversationHistory.has(userId)) {
       this.conversationHistory.set(userId, []);
@@ -277,13 +241,11 @@ class PersonalAI extends EventEmitter {
       timestamp: Date.now()
     });
     
-    // Hafıza sınırı
     if (history.length > this.personality.memoryCapacity) {
       history.shift();
     }
   }
 
-  // Öğrenme verisi kaydetme
   recordLearning(userId, message, response, analysis) {
     this.learningData.push({
       userId,
@@ -293,30 +255,21 @@ class PersonalAI extends EventEmitter {
       timestamp: Date.now()
     });
     
-    // Öğrenme verisi sınırı
     if (this.learningData.length > 10000) {
       this.learningData.shift();
     }
   }
 
-  // Kendini geliştirme kontrolü
   shouldSelfImprove() {
     return this.learningData.length > 0 && this.learningData.length % 100 === 0;
   }
 
-  // Kendini geliştirme
   async improveSelf() {
     try {
-      // Son 100 etkileşimi analiz et
       const recentData = this.learningData.slice(-100);
-      
-      // Pattern'leri bul
       const patterns = this.findPatterns(recentData);
-      
-      // Kişiliği güncelle
       this.updatePersonality(patterns);
       
-      // Log kaydet
       this.selfModificationLog.push({
         timestamp: Date.now(),
         patterns: patterns.length,
@@ -333,23 +286,15 @@ class PersonalAI extends EventEmitter {
     }
   }
 
-  // Pattern bulma
   findPatterns(data) {
     const patterns = [];
     const intentCounts = {};
-    const sentimentCounts = {};
     
     data.forEach(item => {
-      // Intent patterns
       const intent = item.analysis.intent;
       intentCounts[intent] = (intentCounts[intent] || 0) + 1;
-      
-      // Sentiment patterns
-      const sentiment = item.analysis.sentiment;
-      sentimentCounts[sentiment] = (sentimentCounts[sentiment] || 0) + 1;
     });
     
-    // En sık kullanılan intent
     const topIntent = Object.entries(intentCounts)
       .sort(([,a], [,b]) => b - a)[0];
     
@@ -364,7 +309,6 @@ class PersonalAI extends EventEmitter {
     return patterns;
   }
 
-  // Kişilik güncelleme
   updatePersonality(patterns) {
     patterns.forEach(pattern => {
       if (pattern.type === 'frequent_intent') {
@@ -377,7 +321,6 @@ class PersonalAI extends EventEmitter {
     });
   }
 
-  // Kullanıcı istatistikleri
   getUserStats(userId) {
     const profile = this.userProfiles.get(userId);
     if (!profile) return null;
@@ -390,7 +333,6 @@ class PersonalAI extends EventEmitter {
     };
   }
 
-  // Sistem istatistikleri
   getSystemStats() {
     return {
       uptime: Date.now() - this.startTime,
@@ -406,7 +348,7 @@ class PersonalAI extends EventEmitter {
 const app = express();
 const ai = new PersonalAI();
 
-// ÖNEMLİ: Railway için trust proxy ayarı
+// Railway için trust proxy ayarı
 app.set('trust proxy', 1);
 
 // Middleware
@@ -417,8 +359,8 @@ app.use(express.json({ limit: '10mb' }));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 dakika
-  max: 100, // maksimum 100 istek
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: { error: 'Çok fazla istek gönderiyorsun. Lütfen bekle.' }
 });
 app.use(limiter);
@@ -526,13 +468,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-export default app;'''
-
-# Dosyayı oluştur
-with open('index.js', 'w', encoding='utf-8') as f:
-    f.write(index_js_content)
-
-print("✅ Düzeltilmiş index.js dosyası hazırlandı!")
-print("\n🔧 Eklenen düzeltme:")
-print("- app.set('trust proxy', 1); satırı eklendi (Railway için gerekli)")
-print("\n📝 Bu dosyayı GitHub'daki index.js dosyasının yerine kopyala!")
+export default app;
