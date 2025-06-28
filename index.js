@@ -25,6 +25,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+
 class AdvancedPersonalAI extends EventEmitter {
   constructor() {
     super();
@@ -43,10 +44,11 @@ class AdvancedPersonalAI extends EventEmitter {
   }
 
   initializeNLP() {
-  this.stemmer = natural.PorterStemmerTr || natural.PorterStemmer;
-  this.tokenizer = new natural.WordTokenizer();
-  logger.info('NLP modülleri başlatıldı');
-}
+    this.stemmer = natural.PorterStemmerTr || natural.PorterStemmer;
+    this.tokenizer = new natural.WordTokenizer();
+    logger.info('NLP modülleri başlatıldı');
+  }
+
   async initializeDatabase() {
     try {
       // Kullanıcı profilleri
@@ -96,6 +98,7 @@ class AdvancedPersonalAI extends EventEmitter {
       throw error;
     }
   }
+
   loadResponseTemplates() {
     const templates = [
       { intent: 'greeting', template: '{timeGreeting}! Nasıl yardımcı olabilirim?' },
@@ -108,7 +111,6 @@ class AdvancedPersonalAI extends EventEmitter {
       this.responseTemplates.set(template.intent, template);
     });
   }
-
   async processMessage(message, userId = 'default', context = {}) {
     try {
       await this.updateUserProfile(userId, message);
@@ -136,6 +138,7 @@ class AdvancedPersonalAI extends EventEmitter {
       };
     }
   }
+
   async updateUserProfile(userId, message) {
     try {
       const sentiment = this.analyzeSentiment(message);
@@ -226,6 +229,7 @@ class AdvancedPersonalAI extends EventEmitter {
     if (avgWordsPerSentence > 8) return 'medium';
     return 'simple';
   }
+
   async generateResponse(message, userId, analysis) {
     try {
       const context = await this.getConversationContext(userId);
@@ -274,7 +278,6 @@ class AdvancedPersonalAI extends EventEmitter {
   }
 
   async generateAnswer(message, analysis, context) {
-    // Bağlamsal yanıt üretimi
     if (context && context.length > 0) {
       const recentTopics = context.map(c => c.keywords).flat();
       if (recentTopics.length > 0) {
@@ -395,7 +398,6 @@ class AdvancedPersonalAI extends EventEmitter {
 
   async improveSelf() {
     try {
-      // Sık kullanılan kalıpları bul
       const patterns = await pool.query(`
         SELECT intent, COUNT(*) as frequency
         FROM conversation_history 
@@ -405,7 +407,6 @@ class AdvancedPersonalAI extends EventEmitter {
         LIMIT 5
       `);
 
-      // Kişiliği güncelle
       if (patterns.rows.length > 0) {
         const topIntent = patterns.rows[0].intent;
         if (topIntent === 'question') {
@@ -445,120 +446,131 @@ class AdvancedPersonalAI extends EventEmitter {
     }
   }
 }
-// Express App Setup
-const app = express();
-const ai = new AdvancedPersonalAI();
-
-// Railway için trust proxy
-app.set('trust proxy', 1);
-
-// Middleware
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(compression());
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Çok fazla istek. Lütfen bekleyin.' }
-});
-app.use(limiter);
-
-// Request logging
-app.use((req, res, next) => {
-  const start = Date.now();
-  req.requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    logger.info(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
-  });
-  
-  next();
-});
-
-// Routes
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Gelişmiş Kişisel AI Sistemi',
-    version: '2.0.0',
-    status: 'active',
-    endpoints: ['/chat', '/health', '/stats']
-  });
-});
-
-app.get('/health', async (req, res) => {
-  try {
-    // Veritabanı bağlantısını test et
-    await pool.query('SELECT 1');
-    
-    res.json({
-      status: 'healthy',
-      timestamp: Date.now(),
-      database: 'connected',
-      system: await ai.getSystemStats()
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'unhealthy',
-      error: error.message,
-      timestamp: Date.now()
-    });
-  }
-});
-
-app.post('/chat', async (req, res) => {
-  try {
-    const { message, userId } = req.body;
-    
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({
-        error: 'Geçerli bir mesaj göndermelisin'
-      });
+async saveConversation(userId, message, response, analysis) {
+    try {
+      await pool.query(`
+        INSERT INTO conversation_history 
+        (user_id, message, response, sentiment, intent, keywords)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        userId, 
+        message, 
+        response, 
+        analysis.sentiment, 
+        analysis.intent, 
+        JSON.stringify(analysis.keywords)
+      ]);
+    } catch (error) {
+      logger.error('Konuşma kaydetme hatası:', error);
     }
-    
-    if (message.length > 1000) {
-      return res.status(400).json({
-        error: 'Mesaj çok uzun (maksimum 1000 karakter)'
-      });
+  }
+
+  async getConversationContext(userId) {
+    try {
+      const result = await pool.query(`
+        SELECT message, response, keywords, timestamp
+        FROM conversation_history 
+        WHERE user_id = $1 
+        ORDER BY timestamp DESC 
+        LIMIT $2
+      `, [userId, this.personality.contextWindow]);
+      
+      return result.rows;
+    } catch (error) {
+      logger.error('Bağlam getirme hatası:', error);
+      return [];
     }
-    
-    const result = await ai.processMessage(message, userId || 'anonymous');
-    res.json(result);
-    
-  } catch (error) {
-    logger.error('Chat hatası:', error);
-    res.status(500).json({
-      error: 'Bir hata oluştu. Lütfen tekrar deneyin.'
-    });
   }
-});
 
-app.get('/stats', async (req, res) => {
-  try {
-    const stats = await ai.getSystemStats();
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ error: 'İstatistikler alınamadı' });
+  async getUserProfile(userId) {
+    try {
+      const result = await pool.query(`
+        SELECT * FROM user_profiles WHERE user_id = $1
+      `, [userId]);
+      
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error('Kullanıcı profili getirme hatası:', error);
+      return null;
+    }
   }
-});
 
-// Server başlatma
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  logger.info(`🧠 Gelişmiş AI Sistemi ${PORT} portunda çalışıyor`);
-});
+  async getUserStats(userId) {
+    try {
+      const profile = await this.getUserProfile(userId);
+      if (!profile) return null;
+      
+      return {
+        messageCount: profile.message_count,
+        memberSince: new Date(profile.first_seen).toLocaleDateString('tr-TR'),
+        lastSeen: new Date(profile.last_seen).toLocaleDateString('tr-TR'),
+        sentiment: profile.sentiment_stats
+      };
+    } catch (error) {
+      logger.error('Kullanıcı istatistikleri hatası:', error);
+      return null;
+    }
+  }
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM alındı, sistem kapatılıyor...');
-  server.close(() => {
-    pool.end();
-    logger.info('Sistem başarıyla kapatıldı');
-    process.exit(0);
-  });
-});
+  async shouldSelfImprove() {
+    try {
+      const result = await pool.query(`
+        SELECT COUNT(*) as total FROM conversation_history
+      `);
+      const total = parseInt(result.rows[0].total);
+      return total > 0 && total % 50 === 0;
+    } catch (error) {
+      return false;
+    }
+  }
 
-export default app;
+  async improveSelf() {
+    try {
+      const patterns = await pool.query(`
+        SELECT intent, COUNT(*) as frequency
+        FROM conversation_history 
+        WHERE timestamp > NOW() - INTERVAL '24 hours'
+        GROUP BY intent
+        ORDER BY frequency DESC
+        LIMIT 5
+      `);
+
+      if (patterns.rows.length > 0) {
+        const topIntent = patterns.rows[0].intent;
+        if (topIntent === 'question') {
+          this.personality.responseStyle = 'informative';
+        } else if (topIntent === 'greeting') {
+          this.personality.responseStyle = 'friendly';
+        }
+      }
+
+      logger.info('AI kendini geliştirdi', { patterns: patterns.rows });
+      this.emit('self-improved', { patterns: patterns.rows, timestamp: Date.now() });
+      
+    } catch (error) {
+      logger.error('Kendini geliştirme hatası:', error);
+    }
+  }
+
+  async getSystemStats() {
+    try {
+      const userCount = await pool.query('SELECT COUNT(DISTINCT user_id) as count FROM user_profiles');
+      const messageCount = await pool.query('SELECT COUNT(*) as count FROM conversation_history');
+      
+      return {
+        uptime: Date.now() - this.startTime,
+        totalUsers: parseInt(userCount.rows[0].count),
+        totalMessages: parseInt(messageCount.rows[0].count),
+        memoryUsage: process.memoryUsage()
+      };
+    } catch (error) {
+      logger.error('Sistem istatistikleri hatası:', error);
+      return {
+        uptime: Date.now() - this.startTime,
+        totalUsers: 0,
+        totalMessages: 0,
+        memoryUsage: process.memoryUsage()
+      };
+    }
+  }
+}
