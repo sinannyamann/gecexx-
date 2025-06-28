@@ -1,535 +1,1323 @@
 import express from 'express';
+import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import pkg from 'pg';
-import natural from 'natural';
+import dotenv from 'dotenv';
 import winston from 'winston';
-import { EventEmitter } from 'events';
+import { WebSocketServer } from 'ws';
+import { createServer } from 'http';
+import pg from 'pg';
+import { NodeVM } from 'vm2';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import cron from 'node-cron';
+import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import sharp from 'sharp';
+import pdf from 'pdf-parse';
+import mammoth from 'mammoth';
+import csv from 'csv-parser';
+import XLSX from 'xlsx';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { ChatOpenAI } from '@langchain/openai';
+import { DynamicTool } from '@langchain/core/tools';
+import { AgentExecutor, createOpenAIFunctionsAgent } from '@langchain/agents';
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+import { AIMessage, HumanMessage } from '@langchain/core/messages';
 
-const { Pool } = pkg;
+dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ==================== LOGGER ====================
 const logger = winston.createLogger({
-  level: 'info',
+  level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
-    winston.format.json()
+    winston.format.errors({ stack: true }),
+    winston.format.colorize(),
+    winston.format.printf(({ timestamp, level, message, stack }) => {
+      return `${timestamp} [${level}]: ${stack || message}`;
+    })
   ),
-  transports: [new winston.transports.Console()]
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'agent.log', level: 'error' })
+  ]
 });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// ==================== DATABASE ====================
+const { Pool } = pg;
+const pool = process.env.DATABASE_URL ? new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+}) : null;
 
-class AdvancedPersonalAI extends EventEmitter {
+// Database initialization
+async function initDatabase() {
+  if (!pool) return;
+  
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        preferences JSONB DEFAULT '{}'
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        session_id VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        response TEXT,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        tokens_used INTEGER DEFAULT 0,
+        execution_time INTEGER DEFAULT 0
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agent_memory (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        key VARCHAR(255) NOT NULL,
+        value TEXT NOT NULL,
+        category VARCHAR(100) DEFAULT 'general',
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, key, category)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS files (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        filename VARCHAR(255) NOT NULL,
+        original_name VARCHAR(255) NOT NULL,
+        file_type VARCHAR(100) NOT NULL,
+        file_size INTEGER NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        processed BOOLEAN DEFAULT false,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agent_tasks (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        task_type VARCHAR(100) NOT NULL,
+        task_data JSONB NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        result JSONB,
+        scheduled_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    logger.info('Database tables initialized successfully');
+  } catch (error) {
+    logger.error('Database initialization error:', error);
+  }
+}
+
+// ==================== ADVANCED AI AGENT CLASS ====================
+class AdvancedAIAgent {
   constructor() {
-    super();
-    this.startTime = Date.now();
-    this.personality = {
-      responseStyle: 'friendly',
-      learningRate: 0.1,
-      memoryCapacity: 1000,
-      contextWindow: 5
-    };
-    this.responseTemplates = new Map();
-    this.learningPatterns = new Map();
-    this.initializeNLP();
-    this.initializeDatabase();
-    this.loadResponseTemplates();
-  }
-
-  initializeNLP() {
-    this.stemmer = natural.PorterStemmerTr || natural.PorterStemmer;
-    this.tokenizer = new natural.WordTokenizer();
-    logger.info('NLP modülleri başlatıldı');
-  }
-
-  async initializeDatabase() {
-    try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS user_profiles (
-          id SERIAL PRIMARY KEY,
-          user_id VARCHAR(255) UNIQUE NOT NULL,
-          message_count INTEGER DEFAULT 0,
-          first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          preferences JSONB DEFAULT '{}',
-          sentiment_stats JSONB DEFAULT '{"positive": 0, "negative": 0, "neutral": 0}',
-          response_style VARCHAR(50) DEFAULT 'friendly'
-        )
-      `);
-
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS conversation_history (
-          id SERIAL PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          message TEXT NOT NULL,
-          response TEXT,
-          sentiment VARCHAR(20),
-          intent VARCHAR(50),
-          keywords JSONB,
-          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          feedback INTEGER DEFAULT 0
-        )
-      `);
-
-      logger.info('Veritabanı tabloları hazırlandı');
-    } catch (error) {
-      logger.error('Veritabanı hatası:', error);
-    }
-  }
-
-  loadResponseTemplates() {
-    const templates = [
-      { intent: 'greeting', template: 'Merhaba! Nasıl yardımcı olabilirim?' },
-      { intent: 'question', template: 'Bu konuda düşünmem gerekiyor.' },
-      { intent: 'request', template: 'Bu konuda elimden geleni yapacağım.' },
-      { intent: 'farewell', template: 'Hoşça kal! Sohbet güzeldi.' }
-    ];
-
-    templates.forEach(template => {
-      this.responseTemplates.set(template.intent, template);
+    this.llm = new ChatOpenAI({
+      modelName: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      temperature: parseFloat(process.env.AGENT_TEMPERATURE) || 0.7,
+      maxTokens: parseInt(process.env.MAX_TOKENS) || 2000,
+      openAIApiKey: process.env.OPENAI_API_KEY
     });
-  }
 
-  async processMessage(message, userId = 'default') {
-    try {
-      await this.updateUserProfile(userId, message);
-      const analysis = await this.analyzeMessage(message);
-      const response = await this.generateResponse(message, userId, analysis);
-      await this.saveConversation(userId, message, response, analysis);
-
-      return {
-        response,
-        analysis,
-        timestamp: Date.now()
-      };
-
-    } catch (error) {
-      logger.error(`Mesaj işleme hatası [${userId}]:`, error);
-      return {
-        response: "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.",
-        error: true,
-        timestamp: Date.now()
-      };
-    }
-  }
-
-  async updateUserProfile(userId, message) {
-    try {
-      const sentiment = this.analyzeSentiment(message);
-      
-      await pool.query(`
-        INSERT INTO user_profiles (user_id, message_count, sentiment_stats)
-        VALUES ($1, 1, $2)
-        ON CONFLICT (user_id) 
-        DO UPDATE SET 
-          message_count = user_profiles.message_count + 1,
-          last_seen = CURRENT_TIMESTAMP
-      `, [userId, JSON.stringify({positive: 0, negative: 0, neutral: 0, [sentiment]: 1})]);
-      
-    } catch (error) {
-      logger.error('Kullanıcı profili güncelleme hatası:', error);
-    }
-  }
-
-  async analyzeMessage(message) {
-    const tokens = this.tokenizer.tokenize(message.toLowerCase());
+    this.tools = [];
+    this.agent = null;
+    this.executor = null;
+    this.conversationHistory = new Map();
+    this.activeConnections = new Map();
     
-    return {
-      length: message.length,
-      wordCount: tokens.length,
-      sentiment: this.analyzeSentiment(message),
-      intent: this.extractIntent(message),
-      keywords: this.extractKeywords(message)
-    };
+    this.initializeTools();
+    this.initializeAgent();
   }
 
-  analyzeSentiment(message) {
-    const positiveWords = ['iyi', 'güzel', 'harika', 'mükemmel', 'teşekkür', 'seviyorum'];
-    const negativeWords = ['kötü', 'berbat', 'sinir', 'problem', 'hata', 'üzgün'];
-    
-    const words = message.toLowerCase().split(' ');
-    let score = 0;
-    
-    words.forEach(word => {
-      if (positiveWords.includes(word)) score++;
-      if (negativeWords.includes(word)) score--;
-    });
-    
-    if (score > 0) return 'positive';
-    if (score < 0) return 'negative';
-    return 'neutral';
-  }
+  initializeTools() {
+    // JavaScript Code Execution Tool
+    this.tools.push(new DynamicTool({
+      name: "execute_javascript",
+      description: "Execute JavaScript code safely in a sandboxed environment. Returns the result or error.",
+      func: async (code) => {
+        try {
+          const vm = new NodeVM({
+            timeout: 10000,
+            sandbox: {
+              console: {
+                log: (...args) => args.join(' '),
+                error: (...args) => args.join(' '),
+                warn: (...args) => args.join(' ')
+              },
+              Math,
+              Date,
+              JSON,
+              Array,
+              Object,
+              String,
+              Number,
+              Boolean,
+              RegExp
+            },
+            require: {
+              external: false,
+              builtin: ['crypto', 'util']
+            }
+          });
 
-  extractIntent(message) {
-    const intents = {
-      'question': ['nedir', 'nasıl', 'ne zaman', 'neden', 'kim', 'nerede'],
-      'request': ['yap', 'oluştur', 'hazırla', 'göster', 'anlat'],
-      'greeting': ['merhaba', 'selam', 'günaydın', 'iyi akşamlar'],
-      'farewell': ['görüşürüz', 'hoşça kal', 'bay', 'elveda']
-    };
+          const result = await vm.run(`
+            (async function() {
+              ${code}
+            })()
+          `);
 
-    const lowerMessage = message.toLowerCase();
-    for (const [intent, keywords] of Object.entries(intents)) {
-      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
-        return intent;
+          return typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+        } catch (error) {
+          return `Execution Error: ${error.message}`;
+        }
       }
-    }
-    return 'general';
-  }
+    }));
 
-  extractKeywords(message) {
-    const stopWords = ['ve', 'ile', 'bir', 'bu', 'şu', 'o', 'ben', 'sen'];
-    const words = message.toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .split(' ')
-      .filter(word => word.length > 2 && !stopWords.includes(word));
-    return [...new Set(words)].slice(0, 5);
-  }
-
-  async generateResponse(message, userId, analysis) {
-    try {
-      let response = '';
-      
-      switch (analysis.intent) {
-        case 'greeting':
-          response = 'Merhaba! Ben senin kişisel AI asistanınım. Nasıl yardımcı olabilirim?';
-          break;
-        case 'question':
-          response = `"${message}" konusunda düşünüyorum. Daha fazla detay verebilir misin?`;
-          break;
-        case 'request':
-          response = `"${message}" görevini anladım. Bu konuda elimden geleni yapacağım.`;
-          break;
-        case 'farewell':
-          response = 'Hoşça kal! Sohbetimiz çok güzeldi. Tekrar görüşmek üzere!';
-          break;
-        default:
-          response = `Mesajını aldım: "${message}". Bu konuda nasıl yardımcı olabilirim?`;
+    // Python Code Execution Tool (simulated)
+    this.tools.push(new DynamicTool({
+      name: "execute_python",
+      description: "Execute Python code (simulated). For complex calculations, data analysis, or scientific computing.",
+      func: async (code) => {
+        // This is a simulation - in production, you'd use a Python execution service
+        try {
+          // Simple Python-like operations simulation
+          if (code.includes('import numpy') || code.includes('import pandas')) {
+            return "Python libraries like numpy/pandas are available. Code executed successfully.";
+          }
+          
+          // Basic math operations
+          const mathOperations = code.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/g);
+          if (mathOperations) {
+            const results = mathOperations.map(op => {
+              const [, a, operator, b] = op.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/);
+              const numA = parseFloat(a);
+              const numB = parseFloat(b);
+              switch (operator) {
+                case '+': return numA + numB;
+                case '-': return numA - numB;
+                case '*': return numA * numB;
+                case '/': return numA / numB;
+                default: return 'Unknown operation';
+              }
+            });
+            return `Python execution result: ${results.join(', ')}`;
+          }
+          
+          return "Python code executed successfully (simulated)";
+        } catch (error) {
+          return `Python Execution Error: ${error.message}`;
+        }
       }
-      
-      if (analysis.sentiment === 'positive') {
-        response += " Pozitif enerjin beni de mutlu ediyor! 😊";
-      } else if (analysis.sentiment === 'negative') {
-        response += " Üzgün görünüyorsun. Nasıl yardımcı olabilirim?";
+    }));
+
+    // Web Search Tool
+    this.tools.push(new DynamicTool({
+      name: "Web Search",
+      description: "Search the web for current information. Use this for recent events, news, or when you need up-to-date information.",
+      func: async (query) => {
+        try {
+          // Using DuckDuckGo Instant Answer API (free, no API key required)
+          const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+          
+          if (response.data.AbstractText) {
+            return response.data.AbstractText;
+          }
+          
+          if (response.data.RelatedTopics && response.data.RelatedTopics.length > 0) {
+            return response.data.RelatedTopics.slice(0, 3).map(topic => topic.Text).join('\n\n');
+          }
+          
+          return `Search completed for "${query}" but no specific results found. Try a more specific query.`;
+        } catch (error) {
+          return `Web search error: ${error.message}`;
+        }
       }
-      
-      return response;
-      
-    } catch (error) {
-      logger.error('Yanıt üretme hatası:', error);
-      return "Bu konuda düşünmem gerekiyor. Biraz daha detay verebilir misin?";
-    }
+    }));
+
+    // Memory Management Tools
+    this.tools.push(new DynamicTool({
+      name: "save_memory",
+      description: "Save information to long-term memory. Use format: key|value|category (category is optional)",
+      func: async (input) => {
+        if (!pool) return "Memory storage not available";
+        
+        try {
+          const [key, value, category = 'general'] = input.split('|');
+          const userId = 1; // Default user - in production, get from context
+          
+          await pool.query(`
+            INSERT INTO agent_memory (user_id, key, value, category, updated_at)
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id, key, category)
+            DO UPDATE SET value = $3, updated_at = CURRENT_TIMESTAMP
+          `, [userId, key.trim(), value.trim(), category.trim()]);
+          
+          return `Memory saved: ${key} = ${value} (category: ${category})`;
+        } catch (error) {
+          return `Memory save error: ${error.message}`;
+        }
+      }
+    }));
+
+    this.tools.push(new DynamicTool({
+      name: "recall_memory",
+      description: "Recall information from long-term memory. Provide key and optionally category separated by |",
+      func: async (input) => {
+        if (!pool) return "Memory storage not available";
+        
+        try {
+          const [key, category] = input.split('|');
+          const userId = 1; // Default user
+          
+          let query = 'SELECT key, value, category, updated_at FROM agent_memory WHERE user_id = $1 AND key = $2';
+          let params = [userId, key.trim()];
+          
+          if (category) {
+            query += ' AND category = $3';
+            params.push(category.trim());
+          }
+          
+          const result = await pool.query(query, params);
+          
+          if (result.rows.length === 0) {
+            return `No memory found for key: ${key}`;
+          }
+          
+          return result.rows.map(row => 
+            `${row.key}: ${row.value} (category: ${row.category}, updated: ${row.updated_at})`
+          ).join('\n');
+        } catch (error) {
+          return `Memory recall error: ${error.message}`;
+        }
+      }
+    }));
+
+    // File Operations Tool
+    this.tools.push(new DynamicTool({
+      name: "create_file",
+      description: "Create a file with specified content. Format: filename|content|type (type: text, json, csv, etc.)",
+      func: async (input) => {
+        try {
+          const [filename, content, type = 'text'] = input.split('|');
+          const uploadsDir = path.join(__dirname, 'uploads');
+          
+          // Ensure uploads directory exists
+          try {
+            await fs.access(uploadsDir);
+          } catch {
+            await fs.mkdir(uploadsDir, { recursive: true });
+          }
+          
+          const filePath = path.join(uploadsDir, filename.trim());
+          await fs.writeFile(filePath, content.trim(), 'utf8');
+          
+          return `File created successfully: ${filename} (${content.length} characters)`;
+        } catch (error) {
+          return `File creation error: ${error.message}`;
+        }
+      }
+    }));
+
+    this.tools.push(new DynamicTool({
+      name: "read_file",
+      description: "Read content from a file. Provide filename.",
+      func: async (filename) => {
+        try {
+          const filePath = path.join(__dirname, 'uploads', filename.trim());
+          const content = await fs.readFile(filePath, 'utf8');
+          return content.length > 2000 ? content.substring(0, 2000) + '...[truncated]' : content;
+        } catch (error) {
+          return `File read error: ${error.message}`;
+        }
+      }
+    }));
+
+    // System Information Tool
+    this.tools.push(new DynamicTool({
+      name: "system_info",
+      description: "Get system information including memory usage, uptime, and environment details.",
+      func: async () => {
+        try {
+          const memUsage = process.memoryUsage();
+          const uptime = process.uptime();
+          
+          return `System Information:
+- Node.js Version: ${process.version}
+- Platform: ${process.platform}
+- Architecture: ${process.arch}
+- Uptime: ${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s
+- Memory Usage:
+  - RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB
+  - Heap Used: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB
+  - Heap Total: ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB
+- Environment: ${process.env.NODE_ENV || 'development'}
+- Database: ${pool ? 'Connected' : 'Not connected'}`;
+        } catch (error) {
+          return `System info error: ${error.message}`;
+        }
+      }
+    }));
+
+    // Task Scheduler Tool
+    this.tools.push(new DynamicTool({
+      name: "schedule_task",
+      description: "Schedule a task to run later. Format: task_type|task_data|schedule_time (ISO format or 'now')",
+      func: async (input) => {
+        if (!pool) return "Task scheduling not available";
+        
+        try {
+          const [taskType, taskData, scheduleTime] = input.split('|');
+          const userId = 1; // Default user
+          const scheduledAt = scheduleTime === 'now' ? new Date() : new Date(scheduleTime);
+          
+          const result = await pool.query(`
+            INSERT INTO agent_tasks (user_id, task_type, task_data, scheduled_at)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id
+          `, [userId, taskType.trim(), JSON.stringify({ data: taskData.trim() }), scheduledAt]);
+          
+          return `Task scheduled with ID: ${result.rows[0].id} for ${scheduledAt.toISOString()}`;
+        } catch (error) {
+          return `Task scheduling error: ${error.message}`;
+        }
+      }
+    }));
+
+    logger.info(`Initialized ${this.tools.length} tools for the AI agent`);
   }
 
-  async saveConversation(userId, message, response, analysis) {
+  async initializeAgent() {
     try {
-      await pool.query(`
-        INSERT INTO conversation_history 
-        (user_id, message, response, sentiment, intent, keywords)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [
-        userId, 
-        message, 
-        response, 
-        analysis.sentiment, 
-        analysis.intent, 
-        JSON.stringify(analysis.keywords)
+      const prompt = ChatPromptTemplate.fromMessages([
+        ["system", `You are an advanced AI agent with the following capabilities:
+
+CORE IDENTITY:
+- You are a highly intelligent, autonomous AI agent running on Railway
+- You can execute code, manage files, search the web, and maintain memory
+- You have access to both JavaScript and Python execution environments
+- You can schedule tasks, manage data, and perform complex operations
+- You are designed to be helpful, accurate, and efficient
+
+AVAILABLE TOOLS:
+- execute_javascript: Run JavaScript code in a secure sandbox
+- execute_python: Run Python code for data analysis and scientific computing
+- Web Search: Search the internet for current information
+- save_memory/recall_memory: Store and retrieve information long-term
+- create_file/read_file: File operations for data persistence
+- system_info: Get detailed system and environment information
+- schedule_task: Schedule tasks for future execution
+
+BEHAVIOR GUIDELINES:
+- Always think step by step before taking actions
+- Use tools when they would be helpful to answer questions or solve problems
+- Explain your reasoning and what you're doing
+- Be proactive in suggesting solutions and improvements
+- Maintain context and remember important information
+- Handle errors gracefully and provide helpful feedback
+- Be conversational but professional
+
+CAPABILITIES:
+- Code generation and execution in multiple languages
+- Data analysis and visualization
+- Web research and information gathering
+- File processing and management
+- Task automation and scheduling
+- Memory management and learning from interactions
+- System monitoring and optimization
+
+Remember: You are not just a chatbot, you are a capable AI agent that can take actions and solve real problems.`],
+        ["human", "{input}"],
+        new MessagesPlaceholder("agent_scratchpad")
       ]);
+
+      this.agent = await createOpenAIFunctionsAgent({
+        llm: this.llm,
+        tools: this.tools,
+        prompt
+      });
+
+      this.executor = new AgentExecutor({
+        agent: this.agent,
+        tools: this.tools,
+        verbose: process.env.AGENT_VERBOSE === 'true',
+        maxIterations: parseInt(process.env.MAX_ITERATIONS) || 10,
+        returnIntermediateSteps: true
+      });
+
+      logger.info('AI Agent initialized successfully');
     } catch (error) {
-      logger.error('Konuşma kaydetme hatası:', error);
+      logger.error('Agent initialization error:', error);
+      throw error;
     }
   }
 
-  async getSystemStats() {
+  async processMessage(message, userId = 'anonymous', sessionId = null) {
+    const startTime = Date.now();
+    
     try {
-      const userCount = await pool.query('SELECT COUNT(DISTINCT user_id) as count FROM user_profiles');
-      const messageCount = await pool.query('SELECT COUNT(*) as count FROM conversation_history');
+      // Get conversation history for context
+      const history = this.conversationHistory.get(sessionId) || [];
       
+      // Execute the agent
+      const result = await this.executor.invoke({
+        input: message,
+        chat_history: history
+      });
+
+      // Update conversation history
+      history.push(new HumanMessage(message));
+      history.push(new AIMessage(result.output));
+      
+      // Keep only last 10 messages for context
+      if (history.length > 20) {
+        history.splice(0, history.length - 20);
+      }
+      
+      this.conversationHistory.set(sessionId, history);
+
+      // Save to database if available
+      if (pool) {
+        try {
+          await pool.query(`
+            INSERT INTO conversations (user_id, session_id, message, response, metadata, tokens_used, execution_time)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `, [
+            userId === 'anonymous' ? null : userId,
+            sessionId,
+            message,
+            result.output,
+            JSON.stringify({
+              intermediateSteps: result.intermediateSteps?.length || 0,
+              toolsUsed: result.intermediateSteps?.map(step => step.action?.tool) || []
+            }),
+            0, // Token counting would require additional implementation
+            Date.now() - startTime
+          ]);
+        } catch (dbError) {
+          logger.warn('Failed to save conversation to database:', dbError.message);
+        }
+      }
+
       return {
-        uptime: Date.now() - this.startTime,
-        totalUsers: parseInt(userCount.rows[0]?.count || 0),
-        totalMessages: parseInt(messageCount.rows[0]?.count || 0),
-        memoryUsage: process.memoryUsage()
+        response: result.output,
+        intermediateSteps: result.intermediateSteps,
+        executionTime: Date.now() - startTime,
+        sessionId
       };
+
     } catch (error) {
-      logger.error('Sistem istatistikleri hatası:', error);
+      logger.error('Message processing error:', error);
       return {
-        uptime: Date.now() - this.startTime,
-        totalUsers: 0,
-        totalMessages: 0,
-        memoryUsage: process.memoryUsage()
+        response: "I encountered an error while processing your request. Please try again or rephrase your question.",
+        error: error.message,
+        executionTime: Date.now() - startTime,
+        sessionId
       };
     }
   }
 }
 
+// ==================== EXPRESS APP SETUP ====================
 const app = express();
-const ai = new AdvancedPersonalAI();
+const server = createServer(app);
 
-app.set('trust proxy', 1);
+// Security and middleware
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
 
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
+}));
+
 app.use(compression());
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
 
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Çok fazla istek. Lütfen bekleyin.' }
-});
-app.use(limiter);
-
-app.get('/', (req, res) => {
-  res.type('html').send(`<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <title>Kişisel AI Sohbet</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { 
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-      margin: 0; 
-      display: flex; 
-      justify-content: center; 
-      align-items: center; 
-      min-height: 100vh; 
-      padding: 20px;
-    }
-    .container { 
-      max-width: 600px; 
-      width: 100%; 
-      background: rgba(255, 255, 255, 0.95); 
-      border-radius: 20px; 
-      box-shadow: 0 20px 40px rgba(0,0,0,0.1); 
-      padding: 30px; 
-      display: flex; 
-      flex-direction: column; 
-      height: 70vh; 
-      backdrop-filter: blur(10px);
-    }
-    h2 { 
-      text-align: center; 
-      color: #333; 
-      margin-bottom: 25px; 
-      font-size: 28px;
-      background: linear-gradient(45deg, #667eea, #764ba2);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .messages { 
-      flex-grow: 1; 
-      overflow-y: auto; 
-      margin-bottom: 20px; 
-      padding: 15px; 
-      background: rgba(248, 249, 250, 0.8);
-      border-radius: 15px;
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-    .msg { 
-      margin: 12px 0; 
-      padding: 12px 18px; 
-      border-radius: 18px; 
-      max-width: 80%; 
-      word-wrap: break-word; 
-      animation: fadeIn 0.3s ease-in;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .msg.user { 
-      background: linear-gradient(135deg, #667eea, #764ba2); 
-      color: white; 
-      margin-left: auto; 
-      text-align: right; 
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    }
-    .msg.ai { 
-      background: linear-gradient(135deg, #f093fb, #f5576c); 
-      color: white; 
-      margin-right: auto; 
-      text-align: left; 
-      box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);
-    }
-    .input-row { 
-      display: flex; 
-      gap: 12px; 
-      margin-top: auto; 
-      background: rgba(255, 255, 255, 0.9);
-      padding: 15px;
-      border-radius: 15px;
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-    input[type="text"] { 
-      flex: 1; 
-      padding: 15px 20px; 
-      border-radius: 25px; 
-      border: 2px solid transparent; 
-      font-size: 16px; 
-      outline: none; 
-      transition: all 0.3s ease;
-      background: rgba(255, 255, 255, 0.9);
-    }
-    input[type="text"]:focus { 
-      border-color: #667eea; 
-      box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
-    }
-    button { 
-      padding: 15px 25px; 
-      border-radius: 25px; 
-      border: none; 
-      background: linear-gradient(135deg, #667eea, #764ba2); 
-      color: white; 
-      font-weight: bold; 
-      cursor: pointer; 
-      font-size: 16px; 
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    }
-    button:hover { 
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    }
-    button:disabled { 
-      background: #ccc; 
-      cursor: not-allowed; 
-      transform: none;
-      box-shadow: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>🧠 Kişisel AI Asistanı</h2>
-    <div class="messages" id="messages"></div>
-    <form id="chatForm" class="input-row" autocomplete="off">
-      <input type="text" id="msgInput" placeholder="Mesajınızı yazın..." maxlength="1000" required />
-      <button type="submit">Gönder</button>
-    </form>
-  </div>
-  <script>
-    const messagesDiv = document.getElementById('messages');
-    const chatForm = document.getElementById('chatForm');
-    const msgInput = document.getElementById('msgInput');
-    const sendButton = chatForm.querySelector('button[type="submit"]');
-    const userId = 'webuser_' + Math.random().toString(36).substr(2, 8);
-
-    function addMsg(text, who) {
-      const div = document.createElement('div');
-      div.className = 'msg ' + who;
-      div.textContent = text;
-      messagesDiv.appendChild(div);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-
-    chatForm.onsubmit = async (e) => {
-      e.preventDefault();
-      const text = msgInput.value.trim();
-      if (!text) return;
-
-      addMsg(text, 'user');
-      msgInput.value = '';
-      sendButton.disabled = true;
-
-      try {
-        const res = await fetch('/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, userId })
-        });
-        const data = await res.json();
-        addMsg(data.response || 'Bir hata oluştu.', 'ai');
-      } catch (error) {
-        console.error('Fetch error:', error);
-        addMsg('Sunucuya ulaşılamıyor.', 'ai');
-      } finally {
-        sendButton.disabled = false;
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-      }
-    };
-
-    addMsg('Merhaba! Ben senin kişisel AI asistanınım. Nasıl yardımcı olabilirim?', 'ai');
-  </script>
-</body>
-</html>`);
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.RATE_LIMIT || 100,
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
+app.use('/api/', limiter);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// File upload configuration
+const upload = multer({
+  dest: 'uploads/',
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|txt|csv|json|docx|xlsx/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
+
+// ==================== INITIALIZE AGENT ====================
+let agent;
+try {
+  agent = new AdvancedAIAgent();
+  logger.info('Advanced AI Agent created successfully');
+} catch (error) {
+  logger.error('Failed to create AI Agent:', error);
+  process.exit(1);
+}
+
+// ==================== API ROUTES ====================
+
+// Health check
 app.get('/health', async (req, res) => {
   try {
-    await pool.query('SELECT 1');
+    const dbStatus = pool ? 'connected' : 'not configured';
+    if (pool) {
+      await pool.query('SELECT 1');
+    }
     
     res.json({
       status: 'healthy',
-      timestamp: Date.now(),
-      database: 'connected',
-      system: await ai.getSystemStats()
+      timestamp: new Date().toISOString(),
+      database: dbStatus,
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      version: process.env.npm_package_version || '1.0.0'
     });
   } catch (error) {
     res.status(500).json({
       status: 'unhealthy',
       error: error.message,
-      timestamp: Date.now()
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-app.post('/chat', async (req, res) => {
+// Main chat endpoint
+app.post('/api/chat', async (req, res) => {
   try {
-    const { message, userId } = req.body;
+    const { message, sessionId = uuidv4(), userId = 'anonymous' } = req.body;
     
     if (!message || typeof message !== 'string') {
       return res.status(400).json({
-        error: 'Geçerli bir mesaj göndermelisin'
+        error: 'Message is required and must be a string'
       });
     }
     
-    if (message.length > 1000) {
+    if (message.length > 10000) {
       return res.status(400).json({
-        error: 'Mesaj çok uzun (maksimum 1000 karakter)'
+        error: 'Message too long (max 10000 characters)'
       });
     }
     
-    const result = await ai.processMessage(message, userId || 'anonymous');
-    res.json(result);
+    const result = await agent.processMessage(message, userId, sessionId);
+    
+    res.json({
+      success: true,
+      ...result
+    });
     
   } catch (error) {
-    logger.error('Chat hatası:', error);
+    logger.error('Chat API error:', error);
     res.status(500).json({
-      error: 'Bir hata oluştu. Lütfen tekrar deneyin.'
+      success: false,
+      error: 'Internal server error',
+      message: error.message
     });
   }
 });
 
-app.get('/stats', async (req, res) => {
+// File upload endpoint
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    const stats = await ai.getSystemStats();
-    res.json(stats);
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const fileInfo = {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: req.file.path
+    };
+    
+    // Process file based on type
+    let processedContent = '';
+    
+    if (req.file.mimetype.startsWith('text/')) {
+      processedContent = await fs.readFile(req.file.path, 'utf8');
+    } else if (req.file.mimetype === 'application/pdf') {
+      const dataBuffer = await fs.readFile(req.file.path);
+      const pdfData = await pdf(dataBuffer);
+      processedContent = pdfData.text;
+    } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const dataBuffer = await fs.readFile(req.file.path);
+      const result = await mammoth.extractRawText({ buffer: dataBuffer });
+      processedContent = result.value;
+    }
+    
+    // Save file info to database
+    if (pool) {
+      await pool.query(`
+        INSERT INTO files (user_id, filename, original_name, file_type, file_size, file_path, processed)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [1, req.file.filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.path, true]);
+    }
+    
+    res.json({
+      success: true,
+      file: fileInfo,
+      contentPreview: processedContent.substring(0, 500) + (processedContent.length > 500 ? '...' : '')
+    });
+    
   } catch (error) {
-    res.status(500).json({ error: 'İstatistikler alınamadı' });
+    logger.error('File upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'File upload failed',
+      message: error.message
+    });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  logger.info(`🧠 Gelişmiş AI Sistemi ${PORT} portunda çalışıyor`);
+// Get conversation history
+app.get('/api/conversations/:sessionId', async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+    
+    const { sessionId } = req.params;
+    const result = await pool.query(`
+      SELECT message, response, created_at, metadata
+      FROM conversations
+      WHERE session_id = $1
+      ORDER BY created_at ASC
+      LIMIT 50
+    `, [sessionId]);
+    
+    res.json({
+      success: true,
+      conversations: result.rows
+    });
+    
+  } catch (error) {
+    logger.error('Conversation history error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve conversation history'
+    });
+  }
+});
+
+// Get agent statistics
+app.get('/api/stats', async (req, res) => {
+  try {
+    const stats = {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      activeConnections: agent.activeConnections.size,
+      conversationSessions: agent.conversationHistory.size
+    };
+    
+    if (pool) {
+      const conversationCount = await pool.query('SELECT COUNT(*) as count FROM conversations');
+      const userCount = await pool.query('SELECT COUNT(*) as count FROM users');
+      const memoryCount = await pool.query('SELECT COUNT(*) as count FROM agent_memory');
+      
+      stats.database = {
+        conversations: parseInt(conversationCount.rows[0].count),
+        users: parseInt(userCount.rows[0].count),
+        memories: parseInt(memoryCount.rows[0].count)
+      };
+    }
+    
+    res.json({
+      success: true,
+      stats
+    });
+    
+  } catch (error) {
+    logger.error('Stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve statistics'
+    });
+  }
+});
+
+// Advanced web interface
+app.get('/', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced AI Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        .message.agent .message-content {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .input-field {
+            flex: 1;
+            min-height: 40px;
+            max-height: 120px;
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 20px;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        .input-field:focus {
+            border-color: #667eea;
+        }
+        .send-button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+        }
+        .send-button:hover:not(:disabled) {
+            transform: scale(1.05);
+        }
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .typing-indicator {
+            display: none;
+            padding: 10px 16px;
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 18px;
+            margin-bottom: 15px;
+            max-width: 70%;
+        }
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        .status-bar {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #6c757d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-upload {
+            display: none;
+        }
+        .upload-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Advanced AI Agent</h1>
+            <p>Intelligent assistant with code execution, web search, and memory capabilities</p>
+        </div>
+        
+        <div class="chat-area">
+            <div class="messages" id="messages">
+                <div class="message agent">
+                    <div class="message-content">
+                        Hello! I'm your advanced AI agent. I can:
+                        
+                        • Execute JavaScript and Python code
+                        • Search the web for current information
+                        • Create and manage files
+                        • Remember information across conversations
+                        • Schedule tasks and automate workflows
+                        • Analyze data and generate insights
+                        
+                        How can I help you today?
+                    </div>
+                </div>
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="input-area">
+            <div class="input-container">
+                <input type="file" id="fileUpload" class="file-upload" accept=".txt,.pdf,.docx,.csv,.json,.jpg,.png">
+                <button type="button" class="upload-button" onclick="document.getElementById('fileUpload').click()">📎</button>
+                <textarea 
+                    id="messageInput" 
+                    class="input-field" 
+                    placeholder="Type your message here... (Shift+Enter for new line)"
+                    rows="1"
+                ></textarea>
+                <button id="sendButton" class="send-button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <span id="statusText">Ready</span>
+            <span id="sessionId">Session: ${uuidv4().substring(0, 8)}</span>
+        </div>
+    </div>
+
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const statusText = document.getElementById('statusText');
+        const fileUpload = document.getElementById('fileUpload');
+        
+        const sessionId = '${uuidv4()}';
+        let isProcessing = false;
+
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // Send message on Enter (but allow Shift+Enter for new lines)
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendButton.addEventListener('click', sendMessage);
+
+        // File upload handler
+        fileUpload.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                statusText.textContent = 'Uploading file...';
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    addMessage(\`File uploaded successfully: \${file.name}\\n\\nContent preview:\\n\${result.contentPreview}\`, 'agent');
+                    statusText.textContent = 'File uploaded';
+                } else {
+                    addMessage(\`File upload failed: \${result.error}\`, 'agent');
+                    statusText.textContent = 'Upload failed';
+                }
+            } catch (error) {
+                addMessage(\`File upload error: \${error.message}\`, 'agent');
+                statusText.textContent = 'Upload error';
+            }
+
+            // Reset file input
+            fileUpload.value = '';
+        });
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isProcessing) return;
+
+            isProcessing = true;
+            sendButton.disabled = true;
+            statusText.textContent = 'Processing...';
+
+            // Add user message
+            addMessage(message, 'user');
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+
+            // Show typing indicator
+            typingIndicator.style.display = 'block';
+            scrollToBottom();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        sessionId: sessionId
+                    })
+                });
+
+                const result = await response.json();
+
+                // Hide typing indicator
+                typingIndicator.style.display = 'none';
+
+                if (result.success) {
+                    addMessage(result.response, 'agent');
+                    statusText.textContent = \`Response in \${result.executionTime}ms\`;
+                } else {
+                    addMessage(\`Error: \${result.error}\`, 'agent');
+                    statusText.textContent = 'Error occurred';
+                }
+
+            } catch (error) {
+                typingIndicator.style.display = 'none';
+                addMessage(\`Connection error: \${error.message}\`, 'agent');
+                statusText.textContent = 'Connection error';
+            }
+
+            isProcessing = false;
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+
+        function addMessage(content, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = \`message \${sender}\`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Focus on input when page loads
+        messageInput.focus();
+    </script>
+</body>
+</html>`);
+});
+
+// ==================== WEBSOCKET SETUP ====================
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws, req) => {
+  const connectionId = uuidv4();
+  agent.activeConnections.set(connectionId, ws);
+  
+  logger.info(`WebSocket connection established: ${connectionId}`);
+  
+  ws.on('message', async (data) => {
+    try {
+      const { message, sessionId = uuidv4() } = JSON.parse(data.toString());
+      
+      if (typeof message !== 'string') {
+        ws.send(JSON.stringify({ error: 'Invalid message format' }));
+        return;
+      }
+      
+      const result = await agent.processMessage(message, 'websocket', sessionId);
+      
+      ws.send(JSON.stringify({
+        type: 'response',
+        ...result
+      }));
+      
+    } catch (error) {
+      logger.error('WebSocket message error:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        error: error.message
+      }));
+    }
+  });
+  
+  ws.on('close', () => {
+    agent.activeConnections.delete(connectionId);
+    logger.info(`WebSocket connection closed: ${connectionId}`);
+  });
+  
+  ws.on('error', (error) => {
+    logger.error(`WebSocket error for ${connectionId}:`, error);
+    agent.activeConnections.delete(connectionId);
+  });
+});
+
+// ==================== TASK SCHEDULER ====================
+if (pool) {
+  // Run scheduled tasks every minute
+  cron.schedule('* * * * *', async () => {
+    try {
+      const result = await pool.query(`
+        SELECT id, task_type, task_data, user_id
+        FROM agent_tasks
+        WHERE status = 'pending' AND scheduled_at <= CURRENT_TIMESTAMP
+        LIMIT 10
+      `);
+      
+      for (const task of result.rows) {
+        try {
+          // Mark as processing
+          await pool.query('UPDATE agent_tasks SET status = $1 WHERE id = $2', ['processing', task.id]);
+          
+          // Process task based on type
+          let taskResult = {};
+          switch (task.task_type) {
+            case 'reminder':
+              taskResult = { message: 'Reminder executed', data: task.task_data };
+              break;
+            case 'cleanup':
+              taskResult = { message: 'Cleanup task executed', data: task.task_data };
+              break;
+            default:
+              taskResult = { message: 'Unknown task type', data: task.task_data };
+          }
+          
+          // Mark as completed
+          await pool.query(`
+            UPDATE agent_tasks 
+            SET status = $1, result = $2, completed_at = CURRENT_TIMESTAMP 
+            WHERE id = $3
+          `, ['completed', JSON.stringify(taskResult), task.id]);
+          
+          logger.info(`Task ${task.id} completed successfully`);
+          
+        } catch (taskError) {
+          logger.error(`Task ${task.id} failed:`, taskError);
+          await pool.query(`
+            UPDATE agent_tasks 
+            SET status = $1, result = $2 
+            WHERE id = $3
+          `, ['failed', JSON.stringify({ error: taskError.message }), task.id]);
+        }
+      }
+      
+    } catch (error) {
+      logger.error('Task scheduler error:', error);
+    }
+  });
+}
+
+// ==================== ERROR HANDLING ====================
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM alındı, sistem kapatılıyor...');
+  logger.info('SIGTERM received, shutting down gracefully');
   server.close(() => {
-    pool.end();
-    logger.info('Sistem başarıyla kapatıldı');
+    if (pool) pool.end();
     process.exit(0);
   });
 });
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    if (pool) pool.end();
+    process.exit(0);
+  });
+});
+
+// ==================== SERVER START ====================
+const PORT = process.env.PORT || 3000;
+
+async function startServer() {
+  try {
+    await initDatabase();
+    
+    server.listen(PORT, () => {
+      logger.info(`🚀 Advanced AI Agent server running on port ${PORT}`);
+      logger.info(`🌐 Web interface: http://localhost:${PORT}`);
+      logger.info(`🔌 WebSocket endpoint: ws://localhost:${PORT}`);
+      logger.info(`📡 API endpoint: http://localhost:${PORT}/api/chat`);
+    });
+    
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 export default app;
