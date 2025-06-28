@@ -1,4 +1,5 @@
-import express from 'express';
+# Tam index.js dosyası oluştur
+index_js_content = '''import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
@@ -51,7 +52,6 @@ class AdvancedPersonalAI extends EventEmitter {
 
   async initializeDatabase() {
     try {
-      // Kullanıcı profilleri
       await pool.query(`
         CREATE TABLE IF NOT EXISTS user_profiles (
           id SERIAL PRIMARY KEY,
@@ -65,7 +65,6 @@ class AdvancedPersonalAI extends EventEmitter {
         )
       `);
 
-      // Konuşma geçmişi
       await pool.query(`
         CREATE TABLE IF NOT EXISTS conversation_history (
           id SERIAL PRIMARY KEY,
@@ -80,7 +79,6 @@ class AdvancedPersonalAI extends EventEmitter {
         )
       `);
 
-      // Öğrenme verileri
       await pool.query(`
         CREATE TABLE IF NOT EXISTS learning_data (
           id SERIAL PRIMARY KEY,
@@ -111,6 +109,7 @@ class AdvancedPersonalAI extends EventEmitter {
       this.responseTemplates.set(template.intent, template);
     });
   }
+
   async processMessage(message, userId = 'default', context = {}) {
     try {
       await this.updateUserProfile(userId, message);
@@ -214,7 +213,7 @@ class AdvancedPersonalAI extends EventEmitter {
   extractKeywords(message) {
     const stopWords = ['ve', 'ile', 'bir', 'bu', 'şu', 'o', 'ben', 'sen'];
     const words = message.toLowerCase()
-      .replace(/[^\w\s]/g, '')
+      .replace(/[^\\w\\s]/g, '')
       .split(' ')
       .filter(word => word.length > 2 && !stopWords.includes(word));
     return [...new Set(words)].slice(0, 5);
@@ -318,6 +317,7 @@ class AdvancedPersonalAI extends EventEmitter {
     }
     return response;
   }
+
   async saveConversation(userId, message, response, analysis) {
     try {
       await pool.query(`
@@ -446,134 +446,7 @@ class AdvancedPersonalAI extends EventEmitter {
     }
   }
 }
-async saveConversation(userId, message, response, analysis) {
-    try {
-      await pool.query(`
-        INSERT INTO conversation_history 
-        (user_id, message, response, sentiment, intent, keywords)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [
-        userId, 
-        message, 
-        response, 
-        analysis.sentiment, 
-        analysis.intent, 
-        JSON.stringify(analysis.keywords)
-      ]);
-    } catch (error) {
-      logger.error('Konuşma kaydetme hatası:', error);
-    }
-  }
 
-  async getConversationContext(userId) {
-    try {
-      const result = await pool.query(`
-        SELECT message, response, keywords, timestamp
-        FROM conversation_history 
-        WHERE user_id = $1 
-        ORDER BY timestamp DESC 
-        LIMIT $2
-      `, [userId, this.personality.contextWindow]);
-      
-      return result.rows;
-    } catch (error) {
-      logger.error('Bağlam getirme hatası:', error);
-      return [];
-    }
-  }
-
-  async getUserProfile(userId) {
-    try {
-      const result = await pool.query(`
-        SELECT * FROM user_profiles WHERE user_id = $1
-      `, [userId]);
-      
-      return result.rows[0] || null;
-    } catch (error) {
-      logger.error('Kullanıcı profili getirme hatası:', error);
-      return null;
-    }
-  }
-
-  async getUserStats(userId) {
-    try {
-      const profile = await this.getUserProfile(userId);
-      if (!profile) return null;
-      
-      return {
-        messageCount: profile.message_count,
-        memberSince: new Date(profile.first_seen).toLocaleDateString('tr-TR'),
-        lastSeen: new Date(profile.last_seen).toLocaleDateString('tr-TR'),
-        sentiment: profile.sentiment_stats
-      };
-    } catch (error) {
-      logger.error('Kullanıcı istatistikleri hatası:', error);
-      return null;
-    }
-  }
-
-  async shouldSelfImprove() {
-    try {
-      const result = await pool.query(`
-        SELECT COUNT(*) as total FROM conversation_history
-      `);
-      const total = parseInt(result.rows[0].total);
-      return total > 0 && total % 50 === 0;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async improveSelf() {
-    try {
-      const patterns = await pool.query(`
-        SELECT intent, COUNT(*) as frequency
-        FROM conversation_history 
-        WHERE timestamp > NOW() - INTERVAL '24 hours'
-        GROUP BY intent
-        ORDER BY frequency DESC
-        LIMIT 5
-      `);
-
-      if (patterns.rows.length > 0) {
-        const topIntent = patterns.rows[0].intent;
-        if (topIntent === 'question') {
-          this.personality.responseStyle = 'informative';
-        } else if (topIntent === 'greeting') {
-          this.personality.responseStyle = 'friendly';
-        }
-      }
-
-      logger.info('AI kendini geliştirdi', { patterns: patterns.rows });
-      this.emit('self-improved', { patterns: patterns.rows, timestamp: Date.now() });
-      
-    } catch (error) {
-      logger.error('Kendini geliştirme hatası:', error);
-    }
-  }
-
-  async getSystemStats() {
-    try {
-      const userCount = await pool.query('SELECT COUNT(DISTINCT user_id) as count FROM user_profiles');
-      const messageCount = await pool.query('SELECT COUNT(*) as count FROM conversation_history');
-      
-      return {
-        uptime: Date.now() - this.startTime,
-        totalUsers: parseInt(userCount.rows[0].count),
-        totalMessages: parseInt(messageCount.rows[0].count),
-        memoryUsage: process.memoryUsage()
-      };
-    } catch (error) {
-      logger.error('Sistem istatistikleri hatası:', error);
-      return {
-        uptime: Date.now() - this.startTime,
-        totalUsers: 0,
-        totalMessages: 0,
-        memoryUsage: process.memoryUsage()
-      };
-    }
-  }
-}
 // Express App Setup
 const app = express();
 const ai = new AdvancedPersonalAI();
@@ -617,25 +490,135 @@ app.get('/', (req, res) => {
   <title>Kişisel AI Sohbet</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { background: #f5f6fa; font-family: Arial, sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .container { max-width: 500px; width: 90%; margin: 20px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); padding: 24px; display: flex; flex-direction: column; min-height: 400px; }
-    h2 { text-align: center; color: #333; margin-bottom: 20px; }
-    .messages { flex-grow: 1; overflow-y: auto; margin-bottom: 16px; padding-right: 10px; }
-    .msg { margin: 8px 0; padding: 10px 15px; border-radius: 8px; max-width: 80%; word-wrap: break-word; }
-    .msg.user { background: #e0f2f7; color: #2d8cf0; margin-left: auto; text-align: right; }
-    .msg.ai { background: #f0f0f0; color: #222; margin-right: auto; text-align: left; }
-    .input-row { display: flex; gap: 8px; margin-top: auto; }
-    input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; transition: border-color 0.2s; }
-    input[type="text"]:focus { border-color: #2d8cf0; }
-    button { padding: 12px 20px; border-radius: 8px; border: none; background: #2d8cf0; color: #fff; font-weight: bold; cursor: pointer; font-size: 16px; transition: background-color 0.2s; }
-    button:hover { background: #2575d0; }
-    button:disabled { background: #aaa; cursor: not-allowed; }
+    body { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      margin: 0; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 100vh; 
+      padding: 20px;
+    }
+    .container { 
+      max-width: 600px; 
+      width: 100%; 
+      background: rgba(255, 255, 255, 0.95); 
+      border-radius: 20px; 
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1); 
+      padding: 30px; 
+      display: flex; 
+      flex-direction: column; 
+      height: 70vh; 
+      backdrop-filter: blur(10px);
+    }
+    h2 { 
+      text-align: center; 
+      color: #333; 
+      margin-bottom: 25px; 
+      font-size: 28px;
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .messages { 
+      flex-grow: 1; 
+      overflow-y: auto; 
+      margin-bottom: 20px; 
+      padding: 15px; 
+      background: rgba(248, 249, 250, 0.8);
+      border-radius: 15px;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+    .msg { 
+      margin: 12px 0; 
+      padding: 12px 18px; 
+      border-radius: 18px; 
+      max-width: 80%; 
+      word-wrap: break-word; 
+      animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .msg.user { 
+      background: linear-gradient(135deg, #667eea, #764ba2); 
+      color: white; 
+      margin-left: auto; 
+      text-align: right; 
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    .msg.ai { 
+      background: linear-gradient(135deg, #f093fb, #f5576c); 
+      color: white; 
+      margin-right: auto; 
+      text-align: left; 
+      box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);
+    }
+    .input-row { 
+      display: flex; 
+      gap: 12px; 
+      margin-top: auto; 
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px;
+      border-radius: 15px;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+    input[type="text"] { 
+      flex: 1; 
+      padding: 15px 20px; 
+      border-radius: 25px; 
+      border: 2px solid transparent; 
+      font-size: 16px; 
+      outline: none; 
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.9);
+    }
+    input[type="text"]:focus { 
+      border-color: #667eea; 
+      box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+    }
+    button { 
+      padding: 15px 25px; 
+      border-radius: 25px; 
+      border: none; 
+      background: linear-gradient(135deg, #667eea, #764ba2); 
+      color: white; 
+      font-weight: bold; 
+      cursor: pointer; 
+      font-size: 16px; 
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    button:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    button:disabled { 
+      background: #ccc; 
+      cursor: not-allowed; 
+      transform: none;
+      box-shadow: none;
+    }
+    .typing-indicator {
+      display: none;
+      padding: 10px;
+      font-style: italic;
+      color: #666;
+      text-align: center;
+    }
+    .typing-indicator.show {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>🧠 Kişisel AI Sohbet</h2>
+    <h2>🧠 Kişisel AI Asistanı</h2>
     <div class="messages" id="messages"></div>
+    <div class="typing-indicator" id="typingIndicator">AI yazıyor...</div>
     <form id="chatForm" class="input-row" autocomplete="off">
       <input type="text" id="msgInput" placeholder="Mesajınızı yazın..." maxlength="1000" required />
       <button type="submit">Gönder</button>
@@ -646,6 +629,7 @@ app.get('/', (req, res) => {
     const chatForm = document.getElementById('chatForm');
     const msgInput = document.getElementById('msgInput');
     const sendButton = chatForm.querySelector('button[type="submit"]');
+    const typingIndicator = document.getElementById('typingIndicator');
     const userId = 'webuser_' + Math.random().toString(36).substr(2, 8);
 
     function addMsg(text, who) {
@@ -656,6 +640,15 @@ app.get('/', (req, res) => {
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
+    function showTyping() {
+      typingIndicator.classList.add('show');
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function hideTyping() {
+      typingIndicator.classList.remove('show');
+    }
+
     chatForm.onsubmit = async (e) => {
       e.preventDefault();
       const text = msgInput.value.trim();
@@ -664,7 +657,7 @@ app.get('/', (req, res) => {
       addMsg(text, 'user');
       msgInput.value = '';
       sendButton.disabled = true;
-      addMsg('...', 'ai');
+      showTyping();
 
       try {
         const res = await fetch('/chat', {
@@ -673,16 +666,19 @@ app.get('/', (req, res) => {
           body: JSON.stringify({ message: text, userId })
         });
         const data = await res.json();
-        messagesDiv.querySelector('.msg.ai:last-child').textContent = data.response || 'Bir hata oluştu.';
+        hideTyping();
+        addMsg(data.response || 'Bir hata oluştu.', 'ai');
       } catch (error) {
         console.error('Fetch error:', error);
-        messagesDiv.querySelector('.msg.ai:last-child').textContent = 'Sunucuya ulaşılamıyor.';
+        hideTyping();
+        addMsg('Sunucuya ulaşılamıyor.', 'ai');
       } finally {
         sendButton.disabled = false;
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       }
     };
 
+    // İlk mesaj
     addMsg('Merhaba! Ben senin kişisel AI asistanınım. Nasıl yardımcı olabilirim?', 'ai');
   </script>
 </body>
@@ -760,4 +756,8 @@ process.on('SIGTERM', () => {
   });
 });
 
-export default app;
+export default app;'''
+
+# Dosyayı oluştur
+with open('index.js', 'w', encoding='utf-8') as f:
+    f.write(index_js_content)
