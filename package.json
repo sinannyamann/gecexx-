@@ -1,11 +1,12 @@
 {
-  "name": "my-personal-ai",
-  "version": "1.0.0",
-  "description": "Kişisel AI asistanı ve web arayüzü",
+  "name": "advanced-personal-ai",
+  "version": "2.0.0",
+  "description": "PostgreSQL destekli gelişmiş kişisel AI asistanı",
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node --watch index.js"
   },
   "dependencies": {
     "compression": "^1.7.4",
@@ -13,6 +14,11 @@
     "express": "^4.18.2",
     "express-rate-limit": "^6.7.0",
     "helmet": "^7.0.0",
-    "ws": "^8.13.0"
+    "natural": "^6.5.0",
+    "pg": "^8.11.0",
+    "winston": "^3.8.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
