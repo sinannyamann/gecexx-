@@ -1,4 +1,4 @@
-index_js_content = '''import express from 'express';
+import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
@@ -10,7 +10,6 @@ import { EventEmitter } from 'events';
 
 const { Pool } = pkg;
 
-// Logger
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -20,7 +19,6 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()]
 });
 
-// PostgreSQL bağlantısı
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
@@ -78,29 +76,17 @@ class AdvancedPersonalAI extends EventEmitter {
         )
       `);
 
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS learning_data (
-          id SERIAL PRIMARY KEY,
-          pattern_type VARCHAR(100),
-          pattern_value TEXT,
-          frequency INTEGER DEFAULT 1,
-          success_rate FLOAT DEFAULT 0.5,
-          last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
       logger.info('Veritabanı tabloları hazırlandı');
     } catch (error) {
       logger.error('Veritabanı hatası:', error);
-      throw error;
     }
   }
 
   loadResponseTemplates() {
     const templates = [
-      { intent: 'greeting', template: '{timeGreeting}! Nasıl yardımcı olabilirim?' },
-      { intent: 'question', template: 'Bu konuda düşünmem gerekiyor: {message}' },
-      { intent: 'request', template: '{task} konusunda elimden geleni yapacağım.' },
+      { intent: 'greeting', template: 'Merhaba! Nasıl yardımcı olabilirim?' },
+      { intent: 'question', template: 'Bu konuda düşünmem gerekiyor.' },
+      { intent: 'request', template: 'Bu konuda elimden geleni yapacağım.' },
       { intent: 'farewell', template: 'Hoşça kal! Sohbet güzeldi.' }
     ];
 
@@ -109,21 +95,16 @@ class AdvancedPersonalAI extends EventEmitter {
     });
   }
 
-  async processMessage(message, userId = 'default', context = {}) {
+  async processMessage(message, userId = 'default') {
     try {
       await this.updateUserProfile(userId, message);
       const analysis = await this.analyzeMessage(message);
       const response = await this.generateResponse(message, userId, analysis);
       await this.saveConversation(userId, message, response, analysis);
-      
-      if (await this.shouldSelfImprove()) {
-        await this.improveSelf();
-      }
 
       return {
         response,
         analysis,
-        userStats: await this.getUserStats(userId),
         timestamp: Date.now()
       };
 
@@ -147,12 +128,7 @@ class AdvancedPersonalAI extends EventEmitter {
         ON CONFLICT (user_id) 
         DO UPDATE SET 
           message_count = user_profiles.message_count + 1,
-          last_seen = CURRENT_TIMESTAMP,
-          sentiment_stats = jsonb_set(
-            user_profiles.sentiment_stats,
-            '{${sentiment}}',
-            (COALESCE((user_profiles.sentiment_stats->>'${sentiment}')::int, 0) + 1)::text::jsonb
-          )
+          last_seen = CURRENT_TIMESTAMP
       `, [userId, JSON.stringify({positive: 0, negative: 0, neutral: 0, [sentiment]: 1})]);
       
     } catch (error) {
@@ -162,16 +138,13 @@ class AdvancedPersonalAI extends EventEmitter {
 
   async analyzeMessage(message) {
     const tokens = this.tokenizer.tokenize(message.toLowerCase());
-    const stems = tokens.map(token => this.stemmer.stem(token));
     
     return {
       length: message.length,
       wordCount: tokens.length,
       sentiment: this.analyzeSentiment(message),
       intent: this.extractIntent(message),
-      keywords: this.extractKeywords(message),
-      complexity: this.calculateComplexity(message),
-      stems: stems
+      keywords: this.extractKeywords(message)
     };
   }
 
@@ -212,109 +185,45 @@ class AdvancedPersonalAI extends EventEmitter {
   extractKeywords(message) {
     const stopWords = ['ve', 'ile', 'bir', 'bu', 'şu', 'o', 'ben', 'sen'];
     const words = message.toLowerCase()
-      .replace(/[^\\w\\s]/g, '')
+      .replace(/[^\w\s]/g, '')
       .split(' ')
       .filter(word => word.length > 2 && !stopWords.includes(word));
     return [...new Set(words)].slice(0, 5);
   }
 
-  calculateComplexity(message) {
-    const sentences = message.split(/[.!?]+/).length;
-    const words = message.split(' ').length;
-    const avgWordsPerSentence = words / sentences;
-    
-    if (avgWordsPerSentence > 15) return 'complex';
-    if (avgWordsPerSentence > 8) return 'medium';
-    return 'simple';
-  }
-
   async generateResponse(message, userId, analysis) {
     try {
-      const context = await this.getConversationContext(userId);
-      const userProfile = await this.getUserProfile(userId);
-      
       let response = '';
       
       switch (analysis.intent) {
         case 'greeting':
-          response = await this.generateGreeting(userProfile);
+          response = 'Merhaba! Ben senin kişisel AI asistanınım. Nasıl yardımcı olabilirim?';
           break;
         case 'question':
-          response = await this.generateAnswer(message, analysis, context);
+          response = `"${message}" konusunda düşünüyorum. Daha fazla detay verebilir misin?`;
           break;
         case 'request':
-          response = await this.generateTaskResponse(message, analysis);
+          response = `"${message}" görevini anladım. Bu konuda elimden geleni yapacağım.`;
           break;
         case 'farewell':
-          response = await this.generateFarewell(userProfile);
+          response = 'Hoşça kal! Sohbetimiz çok güzeldi. Tekrar görüşmek üzere!';
           break;
         default:
-          response = await this.generateContextualResponse(message, analysis, userProfile, context);
+          response = `Mesajını aldım: "${message}". Bu konuda nasıl yardımcı olabilirim?`;
       }
       
-      return this.personalizeResponse(response, analysis, userProfile);
+      if (analysis.sentiment === 'positive') {
+        response += " Pozitif enerjin beni de mutlu ediyor! 😊";
+      } else if (analysis.sentiment === 'negative') {
+        response += " Üzgün görünüyorsun. Nasıl yardımcı olabilirim?";
+      }
+      
+      return response;
       
     } catch (error) {
       logger.error('Yanıt üretme hatası:', error);
       return "Bu konuda düşünmem gerekiyor. Biraz daha detay verebilir misin?";
     }
-  }
-
-  async generateGreeting(userProfile) {
-    const hour = new Date().getHours();
-    let timeGreeting = 'Merhaba';
-    
-    if (hour < 12) timeGreeting = 'Günaydın';
-    else if (hour < 18) timeGreeting = 'İyi günler';
-    else timeGreeting = 'İyi akşamlar';
-    
-    if (userProfile && userProfile.message_count === 1) {
-      return `${timeGreeting}! Seninle tanıştığıma memnun oldum. Ben senin kişisel AI asistanınım.`;
-    } else {
-      return `${timeGreeting}! Seni tekrar görmek güzel. Nasıl yardımcı olabilirim?`;
-    }
-  }
-
-  async generateAnswer(message, analysis, context) {
-    if (context && context.length > 0) {
-      const recentTopics = context.map(c => c.keywords).flat();
-      if (recentTopics.length > 0) {
-        return `Bu konuyu daha önce de konuştuk. ${message} hakkında daha spesifik ne öğrenmek istiyorsun?`;
-      }
-    }
-    
-    return `"${message}" konusunda düşünüyorum. Daha fazla detay verebilir misin?`;
-  }
-
-  async generateTaskResponse(message, analysis) {
-    if (analysis.keywords.includes('kod')) {
-      return "Kod yazma konusunda yardımcı olabilirim. Hangi dilde ve ne tür bir kod istiyorsun?";
-    }
-    return `"${message}" görevini anladım. Bu konuda elimden geleni yapacağım.`;
-  }
-
-  async generateFarewell(userProfile) {
-    const messageCount = userProfile ? userProfile.message_count : 0;
-    return `Hoşça kal! ${messageCount} mesajlık sohbetimiz çok güzeldi. Tekrar görüşmek üzere!`;
-  }
-
-  async generateContextualResponse(message, analysis, userProfile, context) {
-    let response = `Mesajını aldım: "${message}"`;
-    
-    if (analysis.sentiment === 'positive') {
-      response += " Pozitif enerjin beni de mutlu ediyor! 😊";
-    } else if (analysis.sentiment === 'negative') {
-      response += " Üzgün görünüyorsun. Nasıl yardımcı olabilirim?";
-    }
-    
-    return response;
-  }
-
-  personalizeResponse(response, analysis, userProfile) {
-    if (userProfile && userProfile.response_style === 'formal') {
-      response = response.replace(/😊/g, '').replace(/!+/g, '.');
-    }
-    return response;
   }
 
   async saveConversation(userId, message, response, analysis) {
@@ -336,93 +245,6 @@ class AdvancedPersonalAI extends EventEmitter {
     }
   }
 
-  async getConversationContext(userId) {
-    try {
-      const result = await pool.query(`
-        SELECT message, response, keywords, timestamp
-        FROM conversation_history 
-        WHERE user_id = $1 
-        ORDER BY timestamp DESC 
-        LIMIT $2
-      `, [userId, this.personality.contextWindow]);
-      
-      return result.rows;
-    } catch (error) {
-      logger.error('Bağlam getirme hatası:', error);
-      return [];
-    }
-  }
-
-  async getUserProfile(userId) {
-    try {
-      const result = await pool.query(`
-        SELECT * FROM user_profiles WHERE user_id = $1
-      `, [userId]);
-      
-      return result.rows[0] || null;
-    } catch (error) {
-      logger.error('Kullanıcı profili getirme hatası:', error);
-      return null;
-    }
-  }
-
-  async getUserStats(userId) {
-    try {
-      const profile = await this.getUserProfile(userId);
-      if (!profile) return null;
-      
-      return {
-        messageCount: profile.message_count,
-        memberSince: new Date(profile.first_seen).toLocaleDateString('tr-TR'),
-        lastSeen: new Date(profile.last_seen).toLocaleDateString('tr-TR'),
-        sentiment: profile.sentiment_stats
-      };
-    } catch (error) {
-      logger.error('Kullanıcı istatistikleri hatası:', error);
-      return null;
-    }
-  }
-
-  async shouldSelfImprove() {
-    try {
-      const result = await pool.query(`
-        SELECT COUNT(*) as total FROM conversation_history
-      `);
-      const total = parseInt(result.rows[0].total);
-      return total > 0 && total % 50 === 0;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async improveSelf() {
-    try {
-      const patterns = await pool.query(`
-        SELECT intent, COUNT(*) as frequency
-        FROM conversation_history 
-        WHERE timestamp > NOW() - INTERVAL '24 hours'
-        GROUP BY intent
-        ORDER BY frequency DESC
-        LIMIT 5
-      `);
-
-      if (patterns.rows.length > 0) {
-        const topIntent = patterns.rows[0].intent;
-        if (topIntent === 'question') {
-          this.personality.responseStyle = 'informative';
-        } else if (topIntent === 'greeting') {
-          this.personality.responseStyle = 'friendly';
-        }
-      }
-
-      logger.info('AI kendini geliştirdi', { patterns: patterns.rows });
-      this.emit('self-improved', { patterns: patterns.rows, timestamp: Date.now() });
-      
-    } catch (error) {
-      logger.error('Kendini geliştirme hatası:', error);
-    }
-  }
-
   async getSystemStats() {
     try {
       const userCount = await pool.query('SELECT COUNT(DISTINCT user_id) as count FROM user_profiles');
@@ -430,8 +252,8 @@ class AdvancedPersonalAI extends EventEmitter {
       
       return {
         uptime: Date.now() - this.startTime,
-        totalUsers: parseInt(userCount.rows[0].count),
-        totalMessages: parseInt(messageCount.rows[0].count),
+        totalUsers: parseInt(userCount.rows[0]?.count || 0),
+        totalMessages: parseInt(messageCount.rows[0]?.count || 0),
         memoryUsage: process.memoryUsage()
       };
     } catch (error) {
@@ -446,20 +268,16 @@ class AdvancedPersonalAI extends EventEmitter {
   }
 }
 
-// Express App Setup
 const app = express();
 const ai = new AdvancedPersonalAI();
 
-// Railway için trust proxy
 app.set('trust proxy', 1);
 
-// Middleware
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -467,20 +285,6 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Request logging
-app.use((req, res, next) => {
-  const start = Date.now();
-  req.requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    logger.info(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
-  });
-  
-  next();
-});
-
-// Routes - WEB ARAYÜZÜ İLE
 app.get('/', (req, res) => {
   res.type('html').send(`<!DOCTYPE html>
 <html lang="tr">
@@ -601,23 +405,12 @@ app.get('/', (req, res) => {
       transform: none;
       box-shadow: none;
     }
-    .typing-indicator {
-      display: none;
-      padding: 10px;
-      font-style: italic;
-      color: #666;
-      text-align: center;
-    }
-    .typing-indicator.show {
-      display: block;
-    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>🧠 Kişisel AI Asistanı</h2>
     <div class="messages" id="messages"></div>
-    <div class="typing-indicator" id="typingIndicator">AI yazıyor...</div>
     <form id="chatForm" class="input-row" autocomplete="off">
       <input type="text" id="msgInput" placeholder="Mesajınızı yazın..." maxlength="1000" required />
       <button type="submit">Gönder</button>
@@ -628,7 +421,6 @@ app.get('/', (req, res) => {
     const chatForm = document.getElementById('chatForm');
     const msgInput = document.getElementById('msgInput');
     const sendButton = chatForm.querySelector('button[type="submit"]');
-    const typingIndicator = document.getElementById('typingIndicator');
     const userId = 'webuser_' + Math.random().toString(36).substr(2, 8);
 
     function addMsg(text, who) {
@@ -639,15 +431,6 @@ app.get('/', (req, res) => {
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    function showTyping() {
-      typingIndicator.classList.add('show');
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-
-    function hideTyping() {
-      typingIndicator.classList.remove('show');
-    }
-
     chatForm.onsubmit = async (e) => {
       e.preventDefault();
       const text = msgInput.value.trim();
@@ -656,7 +439,6 @@ app.get('/', (req, res) => {
       addMsg(text, 'user');
       msgInput.value = '';
       sendButton.disabled = true;
-      showTyping();
 
       try {
         const res = await fetch('/chat', {
@@ -665,11 +447,9 @@ app.get('/', (req, res) => {
           body: JSON.stringify({ message: text, userId })
         });
         const data = await res.json();
-        hideTyping();
         addMsg(data.response || 'Bir hata oluştu.', 'ai');
       } catch (error) {
         console.error('Fetch error:', error);
-        hideTyping();
         addMsg('Sunucuya ulaşılamıyor.', 'ai');
       } finally {
         sendButton.disabled = false;
@@ -677,7 +457,6 @@ app.get('/', (req, res) => {
       }
     };
 
-    // İlk mesaj
     addMsg('Merhaba! Ben senin kişisel AI asistanınım. Nasıl yardımcı olabilirim?', 'ai');
   </script>
 </body>
@@ -739,13 +518,11 @@ app.get('/stats', async (req, res) => {
   }
 });
 
-// Server başlatma
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
   logger.info(`🧠 Gelişmiş AI Sistemi ${PORT} portunda çalışıyor`);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM alındı, sistem kapatılıyor...');
   server.close(() => {
@@ -755,8 +532,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-export default app;'''
-
-# Dosyayı oluştur
-with open('index.js', 'w', encoding='utf-8') as f:
-    f.write(index_js_content)
+export default app;
