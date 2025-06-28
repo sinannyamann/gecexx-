@@ -1,4 +1,5 @@
-import express from 'express';
+# Düzeltilmiş index.js dosyasını oluştur
+index_js_content = '''import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
@@ -147,7 +148,7 @@ class PersonalAI extends EventEmitter {
   extractKeywords(message) {
     const stopWords = ['ve', 'ile', 'bir', 'bu', 'şu', 'o', 'ben', 'sen'];
     const words = message.toLowerCase()
-      .replace(/[^\w\s]/g, '')
+      .replace(/[^\\w\\s]/g, '')
       .split(' ')
       .filter(word => word.length > 2 && !stopWords.includes(word));
     
@@ -405,6 +406,9 @@ class PersonalAI extends EventEmitter {
 const app = express();
 const ai = new PersonalAI();
 
+// ÖNEMLİ: Railway için trust proxy ayarı
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet());
 app.use(compression());
@@ -522,4 +526,13 @@ process.on('SIGTERM', () => {
   });
 });
 
-export default app;
+export default app;'''
+
+# Dosyayı oluştur
+with open('index.js', 'w', encoding='utf-8') as f:
+    f.write(index_js_content)
+
+print("✅ Düzeltilmiş index.js dosyası hazırlandı!")
+print("\n🔧 Eklenen düzeltme:")
+print("- app.set('trust proxy', 1); satırı eklendi (Railway için gerekli)")
+print("\n📝 Bu dosyayı GitHub'daki index.js dosyasının yerine kopyala!")
