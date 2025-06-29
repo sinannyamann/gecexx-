@@ -1,6 +1,4 @@
-import json
-
-package_json = {
+{
     "name": "advanced-ai-agent",
     "version": "2.1.0",
     "description": "Gelişmiş AI Ajanı - Kod çalıştırma, web arama, bellek yönetimi ve dosya işleme yetenekleri olan akıllı asistan",
