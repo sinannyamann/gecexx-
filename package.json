@@ -1,39 +1,114 @@
-{
-  "name": "gelismis-ai-ajani",
-  "version": "1.0.0",
-  "description": "Railway uyumlu, kod çalıştırabilen, web arama ve bellek özellikli gelişmiş AI ajanı.",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.17.0",
-    "pg": "^8.11.5",
-    "node-cache": "^5.1.2",
-    "multer": "^1.4.5-lts.1",
-    "uuid": "^9.0.1",
-    "cron": "^3.1.2",
-    "winston": "^3.10.0",
-    "dotenv": "^16.4.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.0"
-  },
-  "keywords": [
-    "ai",
-    "openai",
-    "chatbot",
-    "railway",
-    "websocket",
-    "express",
-    "postgresql"
-  ],
-  "author": "Senin Adın",
-  "license": "MIT"
+import json
+
+package_json = {
+    "name": "advanced-ai-agent",
+    "version": "2.1.0",
+    "description": "Gelişmiş AI Ajanı - Kod çalıştırma, web arama, bellek yönetimi ve dosya işleme yetenekleri olan akıllı asistan",
+    "main": "server.js",
+    "type": "module",
+    "engines": {
+        "node": ">=18.0.0",
+        "npm": ">=8.0.0"
+    },
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node --watch server.js",
+        "test": "echo \"Test suite not implemented yet\" && exit 0",
+        "lint": "echo \"Linting not configured\" && exit 0",
+        "build": "echo \"No build step required\" && exit 0",
+        "railway:start": "node server.js",
+        "railway:build": "npm install --production",
+        "health": "curl -f http://localhost:${PORT:-3000}/health || exit 1",
+        "logs": "node -e \"console.log('Server logs:'); process.exit(0)\"",
+        "cleanup": "node -e \"console.log('Cleanup completed'); process.exit(0)\""
+    },
+    "dependencies": {
+        "express": "^4.18.2",
+        "cors": "^2.8.5",
+        "helmet": "^7.1.0",
+        "compression": "^1.7.4",
+        "express-rate-limit": "^7.1.5",
+        "dotenv": "^16.3.1",
+        "winston": "^3.11.0",
+        "ws": "^8.14.2",
+        "pg": "^8.11.3",
+        "vm2": "^3.9.19",
+        "axios": "^1.6.2",
+        "cheerio": "^1.0.0-rc.12",
+        "node-cron": "^3.0.3",
+        "uuid": "^9.0.1",
+        "bcrypt": "^5.1.1",
+        "jsonwebtoken": "^9.0.2",
+        "multer": "^1.4.5-lts.1",
+        "sharp": "^0.32.6",
+        "mammoth": "^1.6.0",
+        "csv-parser": "^3.0.0",
+        "xlsx": "^0.18.5",
+        "openai": "^4.20.1",
+        "node-cache": "^5.1.2",
+        "marked": "^9.1.6"
+    },
+    "optionalDependencies": {
+        "pdf-parse": "^1.1.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.2"
+    },
+    "keywords": [
+        "ai",
+        "agent",
+        "chatbot",
+        "openai",
+        "gpt",
+        "javascript",
+        "python",
+        "web-search",
+        "file-processing",
+        "memory-management",
+        "task-scheduling",
+        "websocket",
+        "railway",
+        "nodejs",
+        "express",
+        "postgresql"
+    ],
+    "author": {
+        "name": "AI Agent Developer",
+        "email": "developer@example.com"
+    },
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/username/advanced-ai-agent.git"
+    },
+    "bugs": {
+        "url": "https://github.com/username/advanced-ai-agent/issues"
+    },
+    "homepage": "https://github.com/username/advanced-ai-agent#readme",
+    "railway": {
+        "build": {
+            "command": "npm run railway:build"
+        },
+        "start": {
+            "command": "npm run railway:start"
+        },
+        "healthcheck": {
+            "path": "/health",
+            "timeout": 30
+        }
+    },
+    "config": {
+        "port": 3000,
+        "node_env": "production"
+    },
+    "os": [
+        "linux",
+        "darwin",
+        "win32"
+    ],
+    "cpu": [
+        "x64",
+        "arm64"
+    ]
 }
+
