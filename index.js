@@ -696,7 +696,7 @@ class AdvancedAIAgent {
         }
       },
       
-      Web Search: {
+      "Web Search" : {
         name: "Web Search",
         description: "Web'de güncel bilgi arar. Son haberler, güncel olaylar veya güncel bilgiye ihtiyaç duyduğunuzda kullanın.",
         parameters: {
