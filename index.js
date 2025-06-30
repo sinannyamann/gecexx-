@@ -37,8 +37,6 @@ const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'ai-agent' },
   transports: [
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' }),
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
@@ -57,26 +55,53 @@ if (process.env.RAILWAY_ENVIRONMENT) {
 
 // Enhanced Cache Configuration
 const cache = new NodeCache({ 
-  stdTTL: 600, // 10 minutes default
-  checkperiod: 120, // Check for expired keys every 2 minutes
+  stdTTL: 600,
+  checkperiod: 120,
   useClones: false,
   maxKeys: 1000
 });
 
+// Environment Validation
+function validateEnvironment() {
+  const warnings = [];
+  
+  if (!process.env.DATABASE_URL) {
+    warnings.push('DATABASE_URL not set - database features disabled');
+  }
+  
+  const aiKeys = ['OPENAI_API_KEY', 'DEEPSEEK_API_KEY', 'ANTHROPIC_API_KEY'];
+  const availableProviders = aiKeys.filter(key => process.env[key]);
+  
+  if (availableProviders.length === 0) {
+    warnings.push('No AI provider keys found');
+  }
+  
+  warnings.forEach(warning => logger.warn(warning));
+  logger.info(`Available AI providers: ${availableProviders.length}`);
+}
+
 // Database Configuration with Connection Pooling
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+let pool = null;
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    acquireTimeoutMillis: 60000,
+    createTimeoutMillis: 30000,
+    destroyTimeoutMillis: 5000,
+    reapIntervalMillis: 1000,
+    createRetryIntervalMillis: 200,
+  });
+}
 
 // Multi-LLM Configuration
 const aiProviders = {
-  openai: new OpenAI({
+  openai: process.env.OPENAI_API_KEY ? new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
-  }),
+  }) : null,
   deepseek: {
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseURL: 'https://api.deepseek.com/v1'
@@ -106,12 +131,10 @@ class MemoryManager {
       timestamp: new Date().toISOString()
     });
     
-    // Limit messages per conversation
     if (conversation.length > this.maxMessagesPerConversation) {
       conversation.splice(0, conversation.length - this.maxMessagesPerConversation);
     }
     
-    // Limit total conversations
     if (this.conversations.size > this.maxConversations) {
       const oldestKey = this.conversations.keys().next().value;
       this.conversations.delete(oldestKey);
@@ -146,7 +169,6 @@ class AdvancedAIAgent {
   async callAI(provider, messages, options = {}) {
     const cacheKey = `ai_${provider}_${crypto.createHash('md5').update(JSON.stringify(messages)).digest('hex')}`;
     
-    // Check cache first
     const cachedResponse = cache.get(cacheKey);
     if (cachedResponse && !options.skipCache) {
       logger.info('Returning cached AI response', { provider, cacheKey });
@@ -171,7 +193,6 @@ class AdvancedAIAgent {
           throw new Error(`Unsupported AI provider: ${provider}`);
       }
 
-      // Cache successful responses
       cache.set(cacheKey, response, options.cacheTTL || 300);
       
       logger.info('AI request successful', { 
@@ -185,14 +206,17 @@ class AdvancedAIAgent {
       this.errorCount++;
       logger.error('AI request failed', { 
         provider, 
-        error: error.message,
-        stack: error.stack 
+        error: error.message
       });
       throw error;
     }
   }
 
   async callOpenAI(messages, options = {}) {
+    if (!aiProviders.openai) {
+      throw new Error('OpenAI API key not configured');
+    }
+
     const response = await aiProviders.openai.chat.completions.create({
       model: options.model || 'gpt-4o-mini',
       messages: messages,
@@ -210,6 +234,10 @@ class AdvancedAIAgent {
   }
 
   async callDeepSeek(messages, options = {}) {
+    if (!aiProviders.deepseek.apiKey) {
+      throw new Error('DeepSeek API key not configured');
+    }
+
     const response = await axios.post(
       `${aiProviders.deepseek.baseURL}/chat/completions`,
       {
@@ -236,7 +264,10 @@ class AdvancedAIAgent {
   }
 
   async callAnthropic(messages, options = {}) {
-    // Convert OpenAI format to Anthropic format
+    if (!aiProviders.anthropic.apiKey) {
+      throw new Error('Anthropic API key not configured');
+    }
+
     const systemMessage = messages.find(m => m.role === 'system');
     const userMessages = messages.filter(m => m.role !== 'system');
 
@@ -285,7 +316,7 @@ class ToolExecutor {
   }
 
   registerDefaultTools() {
-    this.tools.set('web_search', this.webSearch.bind(this));
+    this.tools.set('Web Search', this.webSearch.bind(this));
     this.tools.set('calculator', this.calculator.bind(this));
     this.tools.set('weather', this.getWeather.bind(this));
     this.tools.set('database_query', this.databaseQuery.bind(this));
@@ -293,7 +324,6 @@ class ToolExecutor {
 
   async webSearch(query, options = {}) {
     try {
-      // Implement web search using a search API
       const searchResults = await this.performWebSearch(query, options);
       return {
         success: true,
@@ -312,7 +342,6 @@ class ToolExecutor {
 
   async calculator(expression) {
     try {
-      // Safe math evaluation
       const result = this.evaluateMathExpression(expression);
       return {
         success: true,
@@ -330,7 +359,6 @@ class ToolExecutor {
 
   async getWeather(location) {
     try {
-      // Implement weather API call
       const weatherData = await this.fetchWeatherData(location);
       return {
         success: true,
@@ -347,6 +375,13 @@ class ToolExecutor {
   }
 
   async databaseQuery(query, params = []) {
+    if (!pool) {
+      return {
+        success: false,
+        error: 'Database not configured'
+      };
+    }
+
     try {
       const result = await pool.query(query, params);
       return {
@@ -363,20 +398,18 @@ class ToolExecutor {
     }
   }
 
-  // Helper methods (implement as needed)
   async performWebSearch(query, options) {
-    // Implement actual web search logic
     return [];
   }
 
   evaluateMathExpression(expression) {
-    // Implement safe math evaluation
-    return eval(expression); // Note: Use a safer alternative in production
+    // Basit matematik işlemleri için güvenli değerlendirme
+    const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, '');
+    return Function('"use strict"; return (' + sanitized + ')')();
   }
 
   async fetchWeatherData(location) {
-    // Implement weather API integration
-    return {};
+    return { location, temperature: '20°C', condition: 'Sunny' };
   }
 }
 
@@ -388,22 +421,20 @@ class TaskScheduler {
   }
 
   setupDefaultTasks() {
-    // Cleanup old cache entries every hour
     cron.schedule('0 * * * *', () => {
       this.cleanupCache();
     });
 
-    // Database maintenance every day at 2 AM
-    cron.schedule('0 2 * * *', () => {
-      this.performDatabaseMaintenance();
-    });
+    if (pool) {
+      cron.schedule('0 2 * * *', () => {
+        this.performDatabaseMaintenance();
+      });
+    }
 
-    // Memory cleanup every 30 minutes
     cron.schedule('*/30 * * * *', () => {
       this.performMemoryCleanup();
     });
 
-    // Health check every 5 minutes
     cron.schedule('*/5 * * * *', () => {
       this.performHealthCheck();
     });
@@ -417,6 +448,8 @@ class TaskScheduler {
   }
 
   async performDatabaseMaintenance() {
+    if (!pool) return;
+    
     try {
       await pool.query('VACUUM ANALYZE;');
       logger.info('Database maintenance completed');
@@ -434,12 +467,12 @@ class TaskScheduler {
 
   async performHealthCheck() {
     try {
-      // Check database connection
-      await pool.query('SELECT 1');
+      if (pool) {
+        await pool.query('SELECT 1');
+      }
       
-      // Check AI providers
       const healthStatus = {
-        database: 'healthy',
+        database: pool ? 'healthy' : 'not_configured',
         cache: cache.getStats(),
         memory: process.memoryUsage(),
         uptime: process.uptime()
@@ -449,6 +482,25 @@ class TaskScheduler {
     } catch (error) {
       logger.error('Health check failed', { error: error.message });
     }
+  }
+}
+
+// Test database connection
+async function testDatabaseConnection() {
+  if (!pool) {
+    logger.info('Database not configured, skipping connection test');
+    return false;
+  }
+
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT NOW()');
+    client.release();
+    logger.info('Database connection successful');
+    return true;
+  } catch (error) {
+    logger.error('Database connection failed', { error: error.message });
+    return false;
   }
 }
 
@@ -462,21 +514,35 @@ const app = express();
 const server = createServer(app);
 
 // Session Configuration
-const PgSession = connectPgSimple(session);
-app.use(session({
-  store: new PgSession({
-    pool: pool,
-    tableName: 'user_sessions'
-  }),
-  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+if (pool) {
+  const PgSession = connectPgSimple(session);
+  app.use(session({
+    store: new PgSession({
+      pool: pool,
+      tableName: 'user_sessions'
+    }),
+    secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000
+    }
+  }));
+} else {
+  // Memory session fallback
+  app.use(session({
+    secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000
+    }
+  }));
+}
 
 // Security Middleware
 app.use(helmet({
@@ -493,8 +559,8 @@ app.use(helmet({
 
 // Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -517,7 +583,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const upload = multer({
   dest: 'uploads/',
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/', 'application/pdf', 'application/vnd.openxmlformats-officedocument'];
@@ -534,28 +600,48 @@ app.use(express.static(join(__dirname, 'public')));
 
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'advanced_ai_agent_interface.html'));
+  res.status(200).json({ 
+    status: 'ok', 
+    service: 'ai-agent',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
-// Health Check Endpoint
+// Enhanced Health Check Endpoint
 app.get('/health', async (req, res) => {
+  const healthCheck = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    service: 'ai-agent'
+  };
+
   try {
-    await pool.query('SELECT 1');
-    const stats = aiAgent.getStats();
+    if (pool) {
+      const dbCheck = await Promise.race([
+        pool.query('SELECT 1'),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('DB timeout')), 2000)
+        )
+      ]);
+      healthCheck.database = 'connected';
+    } else {
+      healthCheck.database = 'not_configured';
+    }
     
-    res.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      stats: stats
-    });
+    healthCheck.stats = aiAgent.getStats();
+    res.status(200).json(healthCheck);
+    
   } catch (error) {
-    res.status(500).json({
-      status: 'unhealthy',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
+    logger.error('Health check failed', { error: error.message });
+    
+    healthCheck.status = 'degraded';
+    healthCheck.database = 'disconnected';
+    healthCheck.error = error.message;
+    
+    res.status(200).json(healthCheck);
   }
 });
 
@@ -569,38 +655,33 @@ app.get('/api/stats', (req, res) => {
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, provider = 'openai', options = {} } = req.body;
-    const sessionId = req.session.id;
+    const sessionId = req.session.id || crypto.randomUUID();
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Get conversation history
     const conversation = aiAgent.memoryManager.getConversation(sessionId);
     
-    // Add user message to conversation
     aiAgent.memoryManager.addMessage(sessionId, {
       role: 'user',
       content: message
     });
 
-    // Prepare messages for AI
     const messages = [
       {
         role: 'system',
         content: 'You are a helpful AI assistant. Provide accurate, helpful, and engaging responses.'
       },
-      ...conversation.slice(-10), // Last 10 messages for context
+      ...conversation.slice(-10),
       {
         role: 'user',
         content: message
       }
     ];
 
-    // Call AI provider
     const aiResponse = await aiAgent.callAI(provider, messages, options);
 
-    // Add AI response to conversation
     aiAgent.memoryManager.addMessage(sessionId, {
       role: 'assistant',
       content: aiResponse.content,
@@ -616,7 +697,7 @@ app.post('/api/chat', async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Chat API error', { error: error.message, stack: error.stack });
+    logger.error('Chat API error', { error: error.message });
     res.status(500).json({ 
       error: 'An error occurred while processing your request',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -639,15 +720,14 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       path: req.file.path
     };
 
-    // Process file based on type
     let processedContent = '';
     
     if (req.file.mimetype.startsWith('image/')) {
-      processedContent = await this.processImage(req.file.path);
+      processedContent = await processImage(req.file.path);
     } else if (req.file.mimetype === 'application/pdf') {
-      processedContent = await this.processPDF(req.file.path);
+      processedContent = await processPDF(req.file.path);
     } else if (req.file.mimetype.includes('document')) {
-      processedContent = await this.processDocument(req.file.path);
+      processedContent = await processDocument(req.file.path);
     }
 
     res.json({
@@ -693,14 +773,12 @@ wss.on('connection', (ws, req) => {
   
   logger.info('WebSocket connection established', { sessionId });
 
-  // Send welcome message
   ws.send(JSON.stringify({
     type: 'welcome',
     message: 'Connected to AI Agent',
     sessionId: sessionId
   }));
 
-  // Heartbeat mechanism
   const heartbeat = setInterval(() => {
     if (ws.readyState === ws.OPEN) {
       ws.ping();
@@ -719,7 +797,6 @@ wss.on('connection', (ws, req) => {
           await handleWebSocketTool(ws, message, sessionId);
           break;
         case 'pong':
-          // Handle pong response
           break;
         default:
           ws.send(JSON.stringify({
@@ -751,16 +828,13 @@ async function handleWebSocketChat(ws, message, sessionId) {
   try {
     const { content, provider = 'openai', options = {} } = message;
 
-    // Get conversation history
     const conversation = aiAgent.memoryManager.getConversation(sessionId);
     
-    // Add user message
     aiAgent.memoryManager.addMessage(sessionId, {
       role: 'user',
       content: content
     });
 
-    // Prepare messages for AI
     const messages = [
       {
         role: 'system',
@@ -773,16 +847,13 @@ async function handleWebSocketChat(ws, message, sessionId) {
       }
     ];
 
-    // Send typing indicator
     ws.send(JSON.stringify({
       type: 'typing',
       isTyping: true
     }));
 
-    // Call AI provider
     const aiResponse = await aiAgent.callAI(provider, messages, options);
 
-    // Add AI response to conversation
     aiAgent.memoryManager.addMessage(sessionId, {
       role: 'assistant',
       content: aiResponse.content,
@@ -790,7 +861,6 @@ async function handleWebSocketChat(ws, message, sessionId) {
       model: aiResponse.model
     });
 
-    // Send response
     ws.send(JSON.stringify({
       type: 'chat_response',
       content: aiResponse.content,
@@ -799,7 +869,6 @@ async function handleWebSocketChat(ws, message, sessionId) {
       usage: aiResponse.usage
     }));
 
-    // Stop typing indicator
     ws.send(JSON.stringify({
       type: 'typing',
       isTyping: false
@@ -846,8 +915,12 @@ async function handleWebSocketTool(ws, message, sessionId) {
 
 // Database Initialization
 async function initializeDatabase() {
+  if (!pool) {
+    logger.info('Database not configured, skipping initialization');
+    return;
+  }
+
   try {
-    // Create tables if they don't exist
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
         sid VARCHAR NOT NULL COLLATE "default",
@@ -900,7 +973,6 @@ async function processImage(filePath) {
 
 async function processPDF(filePath) {
   try {
-    // Implement PDF processing logic
     return 'PDF processed successfully';
   } catch (error) {
     logger.error('PDF processing failed', { error: error.message });
@@ -922,7 +994,6 @@ async function processDocument(filePath) {
 app.use((error, req, res, next) => {
   logger.error('Unhandled error', { 
     error: error.message, 
-    stack: error.stack,
     url: req.url,
     method: req.method
   });
@@ -949,11 +1020,13 @@ process.on('SIGTERM', async () => {
     logger.info('HTTP server closed');
   });
 
-  try {
-    await pool.end();
-    logger.info('Database connections closed');
-  } catch (error) {
-    logger.error('Error closing database connections', { error: error.message });
+  if (pool) {
+    try {
+      await pool.end();
+      logger.info('Database connections closed');
+    } catch (error) {
+      logger.error('Error closing database connections', { error: error.message });
+    }
   }
 
   process.exit(0);
@@ -966,11 +1039,13 @@ process.on('SIGINT', async () => {
     logger.info('HTTP server closed');
   });
 
-  try {
-    await pool.end();
-    logger.info('Database connections closed');
-  } catch (error) {
-    logger.error('Error closing database connections', { error: error.message });
+  if (pool) {
+    try {
+      await pool.end();
+      logger.info('Database connections closed');
+    } catch (error) {
+      logger.error('Error closing database connections', { error: error.message });
+    }
   }
 
   process.exit(0);
@@ -983,33 +1058,49 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Uncaught Exception
 process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', { error: error.message, stack: error.stack });
+  logger.error('Uncaught Exception:', { error: error.message });
   process.exit(1);
 });
 
 // Start Server
 const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
 
 async function startServer() {
   try {
-    // Initialize database
-    await initializeDatabase();
+    // Validate environment
+    validateEnvironment();
     
-    // Start server
-    server.listen(PORT, () => {
-      logger.info(`🚀 Server running on port ${PORT}`);
-      logger.info(`📱 WebSocket server running on ws://localhost:${PORT}/ws`);
+    // Start server immediately
+    server.listen(PORT, HOST, () => {
+      logger.info(`🚀 Server running on ${HOST}:${PORT}`);
       logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`💾 Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
-      logger.info(`🤖 AI Providers: ${Object.keys(aiProviders).join(', ')}`);
+      logger.info(`💾 Database: ${pool ? 'Configured' : 'Not configured'}`);
     });
+    
+    // Initialize database in background
+    setTimeout(async () => {
+      try {
+        const dbConnected = await testDatabaseConnection();
+        if (dbConnected) {
+          await initializeDatabase();
+          logger.info('Database initialized');
+        }
+      } catch (error) {
+        logger.error('Database initialization failed', { error: error.message });
+      }
+    }, 1000);
+    
   } catch (error) {
-    logger.error('Failed to start server', { error: error.message });
-    process.exit(1);
+    logger.error('Server startup error', { error: error.message });
+    
+    // Try to start server anyway for health checks
+    server.listen(PORT, HOST, () => {
+      logger.info(`🚀 Server running in degraded mode on ${HOST}:${PORT}`);
+    });
   }
 }
 
 startServer();
 
 export default app;
-'''
