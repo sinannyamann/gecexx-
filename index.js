@@ -1,3 +1,4 @@
+app.use(express.static(path.join(__dirname, 'public')));
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
