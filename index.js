@@ -1,5 +1,5 @@
-app.use(express.static(path.join(__dirname, 'public')));
 import express from 'express';
+app.use(express.static(path.join(__dirname, 'public')));
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
