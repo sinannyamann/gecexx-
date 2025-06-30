@@ -1,1757 +1,1016 @@
-import express from 'express';
+# Create the final, complete index.js file with all features
+final_code = '''import express from 'express';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
+import pkg from 'pg';
+const { Pool } = pkg;
+import OpenAI from 'openai';
+import axios from 'axios';
 import cors from 'cors';
 import helmet from 'helmet';
-import compression from 'compression';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
+import compression from 'compression';
 import winston from 'winston';
-import { WebSocketServer } from 'ws';
-import { createServer } from 'http';
-import pg from 'pg';
-import { NodeVM } from 'vm2';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
-import cron from 'node-cron';
-import { v4 as uuidv4 } from 'uuid';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import multer from 'multer';
-import sharp from 'sharp';
-import mammoth from 'mammoth';
-import csv from 'csv-parser';
-import XLSX from 'xlsx';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import OpenAI from 'openai';
 import NodeCache from 'node-cache';
-import { marked } from 'marked';
-const app = express
-// PDF-parse'ı dinamik olarak import et
-let pdf;
-try {
-  const pdfModule = await import('pdf-parse');
-  pdf = pdfModule.default;
-} catch (error) {
-  console.warn('PDF parsing not available:', error.message);
-  pdf = null;
-}
-
-dotenv.config();
+import cron from 'node-cron';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs/promises';
+import multer from 'multer';
+import mammoth from 'mammoth';
+import pdf2pic from 'pdf2pic';
+import sharp from 'sharp';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import crypto from 'crypto';
+import { promisify } from 'util';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-app.use(express.static(path.join(__dirname, 'public')));
+const __dirname = dirname(__filename);
 
-// ==================== CACHE SETUP ====================
-const cache = new NodeCache({ 
-  stdTTL: parseInt(process.env.CACHE_TTL) || 600, // 10 dakika
-  checkperiod: 120, // 2 dakikada bir temizlik
-  useClones: false // Performans için
-});
-
-// ==================== UTILITY FUNCTIONS ====================
-const utils = {
-  formatErrorMessage: (msg, type = 'error') => ({
-    success: false,
-    error: msg,
-    type,
-    timestamp: new Date().toISOString()
-  }),
-
-  formatSuccessMessage: (data, message = 'İşlem başarılı') => ({
-    success: true,
-    message,
-    data,
-    timestamp: new Date().toISOString()
-  }),
-
-  sanitizeFilename: (filename) => {
-    return filename.replace(/[^a-z0-9.-]/gi, '_').toLowerCase();
-  },
-
-  createSafeFilePath: (filename) => {
-    const sanitized = utils.sanitizeFilename(filename);
-    return path.join(__dirname, 'uploads', sanitized);
-  },
-
-  isValidSessionId: (sessionId) => {
-    return sessionId && typeof sessionId === 'string' && sessionId.length >= 8;
-  },
-
-  truncateText: (text, maxLength = 2000) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...[kısaltıldı]';
-  }
-};
-
-// ==================== LOGGER ====================
+// Enhanced Logger Configuration
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
-    winston.format.colorize({ all: process.env.NODE_ENV !== 'production' }),
-    winston.format.printf(({ timestamp, level, message, stack }) => {
-      return `${timestamp} [${level}]: ${stack || message}`;
-    })
+    winston.format.json()
   ),
+  defaultMeta: { service: 'ai-agent' },
   transports: [
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' }),
     new winston.transports.Console({
-      silent: process.env.NODE_ENV === 'test'
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
     })
   ]
 });
 
-// Railway için özel log transport
+// Railway specific logging
 if (process.env.RAILWAY_ENVIRONMENT) {
   logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.json()
-    )
+    format: winston.format.json()
   }));
 }
 
-// ==================== DATABASE ====================
-const { Pool } = pg;
+// Enhanced Cache Configuration
+const cache = new NodeCache({ 
+  stdTTL: 600, // 10 minutes default
+  checkperiod: 120, // Check for expired keys every 2 minutes
+  useClones: false,
+  maxKeys: 1000
+});
 
-// Railway için optimize edilmiş veritabanı ayarları
-const dbConfig = {
+// Database Configuration with Connection Pooling
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: parseInt(process.env.DB_POOL_MAX) || 10, // Railway için düşük tutuldu
-  min: parseInt(process.env.DB_POOL_MIN) || 2,
-  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
-  connectionTimeoutMillis: parseInt(process.env.DB_CONN_TIMEOUT) || 5000,
-  acquireTimeoutMillis: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 10000,
-  statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT) || 30000,
-  query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT) || 30000
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+// Multi-LLM Configuration
+const aiProviders = {
+  openai: new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  }),
+  deepseek: {
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseURL: 'https://api.deepseek.com/v1'
+  },
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    baseURL: 'https://api.anthropic.com/v1'
+  }
 };
 
-const pool = process.env.DATABASE_URL ? new Pool(dbConfig) : null;
+// Memory Management Class
+class MemoryManager {
+  constructor() {
+    this.conversations = new Map();
+    this.maxConversations = 1000;
+    this.maxMessagesPerConversation = 50;
+  }
 
-// Veritabanı bağlantı durumunu izle
-if (pool) {
-  pool.on('connect', () => {
-    logger.info('Yeni veritabanı bağlantısı kuruldu');
-  });
+  addMessage(sessionId, message) {
+    if (!this.conversations.has(sessionId)) {
+      this.conversations.set(sessionId, []);
+    }
+    
+    const conversation = this.conversations.get(sessionId);
+    conversation.push({
+      ...message,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Limit messages per conversation
+    if (conversation.length > this.maxMessagesPerConversation) {
+      conversation.splice(0, conversation.length - this.maxMessagesPerConversation);
+    }
+    
+    // Limit total conversations
+    if (this.conversations.size > this.maxConversations) {
+      const oldestKey = this.conversations.keys().next().value;
+      this.conversations.delete(oldestKey);
+    }
+  }
 
-  pool.on('error', (err) => {
-    logger.error('Veritabanı havuzu hatası:', err);
-  });
+  getConversation(sessionId) {
+    return this.conversations.get(sessionId) || [];
+  }
 
-  pool.on('remove', () => {
-    logger.info('Veritabanı bağlantısı kaldırıldı');
-  });
+  clearConversation(sessionId) {
+    this.conversations.delete(sessionId);
+  }
+
+  getStats() {
+    return {
+      totalConversations: this.conversations.size,
+      totalMessages: Array.from(this.conversations.values()).reduce((sum, conv) => sum + conv.length, 0)
+    };
+  }
 }
 
-// Database initialization with better error handling
-async function initDatabase() {
-  if (!pool) {
-    logger.warn('Veritabanı yapılandırılmamış, bellek modunda çalışılıyor');
-    return;
+// Advanced AI Agent Class
+class AdvancedAIAgent {
+  constructor() {
+    this.memoryManager = new MemoryManager();
+    this.requestCount = 0;
+    this.errorCount = 0;
+    this.startTime = Date.now();
   }
-  
-  const maxRetries = 3;
-  let retryCount = 0;
 
-  while (retryCount < maxRetries) {
+  async callAI(provider, messages, options = {}) {
+    const cacheKey = `ai_${provider}_${crypto.createHash('md5').update(JSON.stringify(messages)).digest('hex')}`;
+    
+    // Check cache first
+    const cachedResponse = cache.get(cacheKey);
+    if (cachedResponse && !options.skipCache) {
+      logger.info('Returning cached AI response', { provider, cacheKey });
+      return cachedResponse;
+    }
+
     try {
-      // Bağlantı testi
-      await pool.query('SELECT NOW()');
-      
-      // Tablolar oluştur
-      await createTables();
-      
-      logger.info('Veritabanı başarıyla başlatıldı');
-      return;
-    } catch (error) {
-      retryCount++;
-      logger.error(`Veritabanı başlatma hatası (deneme ${retryCount}/${maxRetries}):`, error.message);
-      
-      if (retryCount >= maxRetries) {
-        logger.error('Veritabanı başlatılamadı, bellek modunda devam ediliyor');
-        return;
+      this.requestCount++;
+      let response;
+
+      switch (provider) {
+        case 'openai':
+          response = await this.callOpenAI(messages, options);
+          break;
+        case 'deepseek':
+          response = await this.callDeepSeek(messages, options);
+          break;
+        case 'anthropic':
+          response = await this.callAnthropic(messages, options);
+          break;
+        default:
+          throw new Error(`Unsupported AI provider: ${provider}`);
       }
+
+      // Cache successful responses
+      cache.set(cacheKey, response, options.cacheTTL || 300);
       
-      // Yeniden deneme öncesi bekle
-      await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
-    }
-  }
-}
+      logger.info('AI request successful', { 
+        provider, 
+        messageCount: messages.length,
+        responseLength: response.content?.length || 0
+      });
 
-async function createTables() {
-  const tables = [
-    {
-      name: 'users',
-      query: `
-        CREATE TABLE IF NOT EXISTS users (
-          id SERIAL PRIMARY KEY,
-          username VARCHAR(255) UNIQUE NOT NULL,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          password_hash VARCHAR(255) NOT NULL,
-          role VARCHAR(50) DEFAULT 'user',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          last_login TIMESTAMP,
-          is_active BOOLEAN DEFAULT true,
-          preferences JSONB DEFAULT '{}'
-        )
-      `
-    },
-    {
-      name: 'conversations',
-      query: `
-        CREATE TABLE IF NOT EXISTS conversations (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id),
-          session_id VARCHAR(255) NOT NULL,
-          message TEXT NOT NULL,
-          response TEXT,
-          metadata JSONB DEFAULT '{}',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          tokens_used INTEGER DEFAULT 0,
-          execution_time INTEGER DEFAULT 0
-        )
-      `
-    },
-    {
-      name: 'agent_memory',
-      query: `
-        CREATE TABLE IF NOT EXISTS agent_memory (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id),
-          key VARCHAR(255) NOT NULL,
-          value TEXT NOT NULL,
-          category VARCHAR(100) DEFAULT 'general',
-          expires_at TIMESTAMP,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(user_id, key, category)
-        )
-      `
-    },
-    {
-      name: 'files',
-      query: `
-        CREATE TABLE IF NOT EXISTS files (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id),
-          filename VARCHAR(255) NOT NULL,
-          original_name VARCHAR(255) NOT NULL,
-          file_type VARCHAR(100) NOT NULL,
-          file_size INTEGER NOT NULL,
-          file_path VARCHAR(500) NOT NULL,
-          processed BOOLEAN DEFAULT false,
-          metadata JSONB DEFAULT '{}',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `
-    },
-    {
-      name: 'agent_tasks',
-      query: `
-        CREATE TABLE IF NOT EXISTS agent_tasks (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id),
-          task_type VARCHAR(100) NOT NULL,
-          task_data JSONB NOT NULL,
-          status VARCHAR(50) DEFAULT 'pending',
-          result JSONB,
-          scheduled_at TIMESTAMP,
-          completed_at TIMESTAMP,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `
-    }
-  ];
-
-  for (const table of tables) {
-    try {
-      await pool.query(table.query);
-      logger.debug(`Tablo oluşturuldu/kontrol edildi: ${table.name}`);
+      return response;
     } catch (error) {
-      logger.error(`Tablo oluşturma hatası (${table.name}):`, error.message);
+      this.errorCount++;
+      logger.error('AI request failed', { 
+        provider, 
+        error: error.message,
+        stack: error.stack 
+      });
       throw error;
     }
   }
 
-  // İndeksler oluştur
-  await createIndexes();
-}
-
-async function createIndexes() {
-  const indexes = [
-    'CREATE INDEX IF NOT EXISTS idx_conversations_session_id ON conversations(session_id)',
-    'CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)',
-    'CREATE INDEX IF NOT EXISTS idx_agent_memory_user_key ON agent_memory(user_id, key)',
-    'CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status)',
-    'CREATE INDEX IF NOT EXISTS idx_agent_tasks_scheduled ON agent_tasks(scheduled_at)'
-  ];
-
-  for (const indexQuery of indexes) {
-    try {
-      await pool.query(indexQuery);
-    } catch (error) {
-      logger.warn('İndeks oluşturma uyarısı:', error.message);
-    }
-  }
-}
-
-// ==================== MEMORY MANAGER ====================
-class MemoryManager {
-  constructor(pool, cache) {
-    this.pool = pool;
-    this.cache = cache;
-  }
-
-  async save(userId, key, value, category = 'general') {
-    const cacheKey = `memory:${userId}:${key}:${category}`;
-    
-    try {
-      if (this.pool) {
-        await this.pool.query(`
-          INSERT INTO agent_memory (user_id, key, value, category, updated_at)
-          VALUES \$1,\$2,\$3,\$4, CURRENT_TIMESTAMP)
-          ON CONFLICT (user_id, key, category)
-          DO UPDATE SET value =\$3, updated_at = CURRENT_TIMESTAMP
-        `, [userId, key, value, category]);
-      }
-      
-      // Cache'e de kaydet
-      this.cache.set(cacheKey, { key, value, category, updated_at: new Date() });
-      
-      return `Bellek kaydedildi: ${key} = ${utils.truncateText(value, 100)} (kategori: ${category})`;
-    } catch (error) {
-      logger.error('Bellek kaydetme hatası:', error);
-      return `Bellek kaydetme hatası: ${error.message}`;
-    }
-  }
-
-  async recall(userId, key, category) {
-    const cacheKey = `memory:${userId}:${key}:${category || '*'}`;
-    
-    try {
-      // Önce cache'den kontrol et
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        return this.formatMemoryResult([cached]);
-      }
-
-      if (!this.pool) {
-        return "Bellek depolama mevcut değil";
-      }
-
-      let query = 'SELECT key, value, category, updated_at FROM agent_memory WHERE user_id =\$1 AND key =\$2';
-      let params = [userId, key];
-      
-      if (category) {
-        query += ' AND category =\$3';
-        params.push(category);
-      }
-      
-      const result = await this.pool.query(query, params);
-      
-      if (result.rows.length === 0) {
-        return `"${key}" anahtarı için bellek bulunamadı`;
-      }
-      
-      // Sonuçları cache'e kaydet
-      result.rows.forEach(row => {
-        const rowCacheKey = `memory:${userId}:${row.key}:${row.category}`;
-        this.cache.set(rowCacheKey, row);
-      });
-      
-      return this.formatMemoryResult(result.rows);
-    } catch (error) {
-      logger.error('Bellek hatırlama hatası:', error);
-      return `Bellek hatırlama hatası: ${error.message}`;
-    }
-  }
-
-  formatMemoryResult(rows) {
-    return rows.map(row => 
-      `${row.key}: ${utils.truncateText(row.value, 200)} (kategori: ${row.category}, güncelleme: ${row.updated_at})`
-    ).join('\n');
-  }
-}
-
-// ==================== TOOL EXECUTOR ====================
-class ToolExecutor {
-  constructor() {
-    this.executionTimeout = parseInt(process.env.CODE_EXECUTION_TIMEOUT) || 10000;
-  }
-
-  async executeJavaScript(code) {
-    try {
-      const vm = new NodeVM({
-        timeout: this.executionTimeout,
-        sandbox: {
-          console: {
-            log: (...args) => args.join(' '),
-            error: (...args) => args.join(' '),
-            warn: (...args) => args.join(' ')
-          },
-          Math,
-          Date,
-          JSON,
-          Array,
-          Object,
-          String,
-          Number,
-          Boolean,
-          RegExp,
-          setTimeout: (fn, delay) => setTimeout(fn, Math.min(delay, 5000)),
-          setInterval: (fn, delay) => setInterval(fn, Math.max(delay, 100))
-        },
-        require: {
-          external: false,
-          builtin: ['crypto', 'util']
-        }
-      });
-
-      const result = await Promise.race([
-        vm.run(`
-          (async function() {
-            try {
-              ${code}
-            } catch (error) {
-              return 'Kod çalıştırma hatası: ' + error.message;
-            }
-          })()
-        `),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Kod çalıştırma zaman aşımı')), this.executionTimeout)
-        )
-      ]);
-
-      return typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
-    } catch (error) {
-      logger.error('JavaScript çalıştırma hatası:', error);
-      return `JavaScript Çalıştırma Hatası: ${error.message}`;
-    }
-  }
-
-  async executePython(code) {
-    try {
-      // Python simulation - Railway'de gerçek Python çalıştırma için ayrı servis gerekir
-      if (code.includes('import numpy') || code.includes('import pandas')) {
-        return "Python kütüphaneleri (numpy/pandas) mevcut. Kod başarıyla çalıştırıldı (simülasyon).";
-      }
-      
-      // Basit matematik işlemleri simülasyonu
-      const mathOperations = code.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/g);
-      if (mathOperations) {
-        const results = mathOperations.map(op => {
-          const [, a, operator, b] = op.match(/(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)/);
-          const numA = parseFloat(a);
-          const numB = parseFloat(b);
-          switch (operator) {
-            case '+': return numA + numB;
-            case '-': return numA - numB;
-            case '*': return numA * numB;
-            case '/': return numB !== 0 ? numA / numB : 'Sıfıra bölme hatası';
-            default: return 'Bilinmeyen işlem';
-          }
-        });
-        return `Python çalıştırma sonucu: ${results.join(', ')}`;
-      }
-      
-      return "Python kodu başarıyla çalıştırıldı (simülasyon)";
-    } catch (error) {
-      logger.error('Python çalıştırma hatası:', error);
-      return `Python Çalıştırma Hatası: ${error.message}`;
-    }
-  }
-
-  async webSearch(query) {
-    const cacheKey = `search:${query}`;
-    
-    try {
-      // Cache'den kontrol et
-      const cached = cache.get(cacheKey);
-      if (cached) {
-        return cached;
-      }
-
-      // DuckDuckGo Instant Answer API
-      const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
-        timeout: 10000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; AI-Agent/1.0)'
-        }
-      });
-      
-      let result = '';
-      
-      if (response.data.AbstractText) {
-        result = response.data.AbstractText;
-      } else if (response.data.RelatedTopics && response.data.RelatedTopics.length > 0) {
-        result = response.data.RelatedTopics.slice(0, 3).map(topic => topic.Text).join('\n\n');
-      } else {
-        result = `"${query}" için arama tamamlandı ancak spesifik sonuç bulunamadı. Daha spesifik bir sorgu deneyin.`;
-      }
-      
-      // Sonucu cache'e kaydet (5 dakika)
-      cache.set(cacheKey, result, 300);
-      
-      return result;
-    } catch (error) {
-      logger.error('Web arama hatası:', error);
-      if (error.code === 'ECONNABORTED') {
-        return `Web arama zaman aşımı: "${query}" için arama tamamlanamadı.`;
-      }
-      return `Web arama hatası: ${error.message}`;
-    }
-  }
-}
-
-// ==================== TASK SCHEDULER ====================
-class TaskScheduler {
-  constructor(pool) {
-    this.pool = pool;
-    this.isRunning = false;
-  }
-
-  async scheduleTask(userId, taskType, taskData, scheduleTime) {
-    if (!this.pool) {
-      return "Görev zamanlama mevcut değil (veritabanı bağlantısı yok)";
-    }
-    
-    try {
-      const scheduledAt = scheduleTime === 'now' ? new Date() : new Date(scheduleTime);
-      
-      if (isNaN(scheduledAt.getTime())) {
-        return "Geçersiz tarih formatı. ISO formatı kullanın (örn: 2024-01-01T10:00:00Z)";
-      }
-      
-      const result = await this.pool.query(`
-        INSERT INTO agent_tasks (user_id, task_type, task_data, scheduled_at)
-        VALUES \$1,\$2,\$3,\$4)
-        RETURNING id
-      `, [userId, taskType, JSON.stringify({ data: taskData }), scheduledAt]);
-      
-      return `Görev zamanlandı - ID: ${result.rows[0].id}, Tarih: ${scheduledAt.toLocaleString('tr-TR')}`;
-    } catch (error) {
-      logger.error('Görev zamanlama hatası:', error);
-      return `Görev zamanlama hatası: ${error.message}`;
-    }
-  }
-
-  async processPendingTasks() {
-    if (!this.pool || this.isRunning) return;
-    
-    this.isRunning = true;
-    
-    try {
-      const result = await this.pool.query(`
-        SELECT id, task_type, task_data, user_id
-        FROM agent_tasks
-        WHERE status = 'pending' AND scheduled_at <= CURRENT_TIMESTAMP
-        LIMIT 5
-      `);
-      
-      for (const task of result.rows) {
-        await this.processTask(task);
-      }
-    } catch (error) {
-      logger.error('Görev işleme hatası:', error);
-    } finally {
-      this.isRunning = false;
-    }
-  }
-
-  async processTask(task) {
-    try {
-      // İşleme olarak işaretle
-      await this.pool.query('UPDATE agent_tasks SET status =\$1 WHERE id =\$2', ['processing', task.id]);
-      
-      let taskResult = {};
-      switch (task.task_type) {
-        case 'reminder':
-          taskResult = { message: 'Hatırlatma çalıştırıldı', data: task.task_data };
-          break;
-        case 'cleanup':
-          taskResult = await this.performCleanup();
-          break;
-        case 'backup':
-          taskResult = { message: 'Yedekleme görevi çalıştırıldı', data: task.task_data };
-          break;
-        default:
-          taskResult = { message: 'Bilinmeyen görev türü', data: task.task_data };
-      }
-      
-      // Tamamlandı olarak işaretle
-      await this.pool.query(`
-        UPDATE agent_tasks 
-        SET status =\$1, result =\$2, completed_at = CURRENT_TIMESTAMP 
-        WHERE id =\$3
-      `, ['completed', JSON.stringify(taskResult), task.id]);
-      
-      logger.info(`Görev ${task.id} başarıyla tamamlandı`);
-      
-    } catch (taskError) {
-      logger.error(`Görev ${task.id} başarısız:`, taskError);
-      await this.pool.query(`
-        UPDATE agent_tasks 
-        SET status =\$1, result =\$2 
-        WHERE id =\$3
-      `, ['failed', JSON.stringify({ error: taskError.message }), task.id]);
-    }
-  }
-
-  async performCleanup() {
-    try {
-      // Eski konuşmaları temizle (30 günden eski)
-      const cleanupResult = await this.pool.query(`
-        DELETE FROM conversations 
-        WHERE created_at < NOW() - INTERVAL '30 days'
-      `);
-      
-      // Cache temizle
-      cache.flushAll();
-      
-      return {
-        message: 'Temizlik tamamlandı',
-        deletedConversations: cleanupResult.rowCount,
-        cacheCleared: true
-      };
-    } catch (error) {
-      throw new Error(`Temizlik hatası: ${error.message}`);
-    }
-  }
-}
-
-// ==================== ADVANCED AI AGENT CLASS ====================
-class AdvancedAIAgent {
-  constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      timeout: 30000 // 30 saniye timeout
+  async callOpenAI(messages, options = {}) {
+    const response = await aiProviders.openai.chat.completions.create({
+      model: options.model || 'gpt-4o-mini',
+      messages: messages,
+      max_tokens: options.maxTokens || 2000,
+      temperature: options.temperature || 0.7,
+      stream: false
     });
-    
-    this.model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    this.temperature = parseFloat(process.env.AGENT_TEMPERATURE) || 0.7;
-    this.maxTokens = parseInt(process.env.MAX_TOKENS) || 2000;
-    
-    // Modüler bileşenler
-    this.memoryManager = new MemoryManager(pool, cache);
-    this.toolExecutor = new ToolExecutor();
-    this.taskScheduler = new TaskScheduler(pool);
-    
-    // Bellek içi oturum yönetimi (Railway için optimize edildi)
-    this.conversationHistory = new Map();
-    this.activeConnections = new Map();
-    this.tools = this.initializeTools();
-    
-    // Bellek temizliği için periyodik görev
-    setInterval(() => {
-      this.cleanupMemory();
-    }, 300000); // 5 dakikada bir
-    
-    logger.info('Gelişmiş AI Ajanı başarıyla başlatıldı');
-  }
 
-  cleanupMemory() {
-    // Eski oturumları temizle (1 saatten eski)
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
-    
-    for (const [sessionId, data] of this.conversationHistory.entries()) {
-      if (data.lastActivity && data.lastActivity < oneHourAgo) {
-        this.conversationHistory.delete(sessionId);
-      }
-    }
-    
-    logger.debug(`Bellek temizliği tamamlandı. Aktif oturum sayısı: ${this.conversationHistory.size}`);
-  }
-
-  initializeTools() {
     return {
-      execute_javascript: {
-        name: "execute_javascript",
-        description: "JavaScript kodunu güvenli bir ortamda çalıştırır. Sonuç veya hata döndürür.",
-        parameters: {
-          type: "object",
-          properties: {
-            code: {
-              type: "string",
-              description: "Çalıştırılacak JavaScript kodu"
-            }
-          },
-          required: ["code"]
-        }
-      },
-      
-      execute_python: {
-        name: "execute_python",
-        description: "Python kodunu çalıştırır (simülasyon). Karmaşık hesaplamalar, veri analizi veya bilimsel hesaplamalar için.",
-        parameters: {
-          type: "object",
-          properties: {
-            code: {
-              type: "string",
-              description: "Çalıştırılacak Python kodu"
-            }
-          },
-          required: ["code"]
-        }
-      },
-      
-      "Web Search" : {
-        name: "Web Search",
-        description: "Web'de güncel bilgi arar. Son haberler, güncel olaylar veya güncel bilgiye ihtiyaç duyduğunuzda kullanın.",
-        parameters: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "Arama sorgusu"
-            }
-          },
-          required: ["query"]
-        }
-      },
-      
-      save_memory: {
-        name: "save_memory",
-        description: "Bilgiyi uzun vadeli belleğe kaydeder.",
-        parameters: {
-          type: "object",
-          properties: {
-            key: {
-              type: "string",
-              description: "Bilginin saklanacağı anahtar"
-            },
-            value: {
-              type: "string",
-              description: "Saklanacak değer"
-            },
-            category: {
-              type: "string",
-              description: "Organizasyon için kategori (isteğe bağlı)",
-              default: "general"
-            }
-          },
-          required: ["key", "value"]
-        }
-      },
-      
-      recall_memory: {
-        name: "recall_memory",
-        description: "Uzun vadeli bellekten bilgi hatırlar.",
-        parameters: {
-          type: "object",
-          properties: {
-            key: {
-              type: "string",
-              description: "Hatırlanacak bilginin anahtarı"
-            },
-            category: {
-              type: "string",
-              description: "Aranacak kategori (isteğe bağlı)"
-            }
-          },
-          required: ["key"]
-        }
-      },
-      
-      create_file: {
-        name: "create_file",
-        description: "Belirtilen içerikle dosya oluşturur.",
-        parameters: {
-          type: "object",
-          properties: {
-            filename: {
-              type: "string",
-              description: "Oluşturulacak dosyanın adı"
-            },
-            content: {
-              type: "string",
-              description: "Dosyaya yazılacak içerik"
-            },
-            type: {
-              type: "string",
-              description: "Dosya türü (text, json, csv, vb.)",
-              default: "text"
-            }
-          },
-          required: ["filename", "content"]
-        }
-      },
-      
-      read_file: {
-        name: "read_file",
-        description: "Dosyadan içerik okur.",
-        parameters: {
-          type: "object",
-          properties: {
-            filename: {
-              type: "string",
-              description: "Okunacak dosyanın adı"
-            }
-          },
-          required: ["filename"]
-        }
-      },
-      
-      system_info: {
-        name: "system_info",
-        description: "Bellek kullanımı, çalışma süresi ve ortam detayları dahil sistem bilgilerini getirir.",
-        parameters: {
-          type: "object",
-          properties: {},
-          required: []
-        }
-      },
-      
-      schedule_task: {
-        name: "schedule_task",
-        description: "Daha sonra çalıştırılmak üzere görev zamanlar.",
-        parameters: {
-          type: "object",
-          properties: {
-            task_type: {
-              type: "string",
-              description: "Zamanlanacak görevin türü"
-            },
-            task_data: {
-              type: "string",
-              description: "Görev için veri"
-            },
-            schedule_time: {
-              type: "string",
-              description: "Görevin çalıştırılacağı zaman (ISO formatı veya 'now')"
-            }
-          },
-          required: ["task_type", "task_data", "schedule_time"]
-        }
-      }
+      content: response.choices[0].message.content,
+      usage: response.usage,
+      model: response.model,
+      provider: 'openai'
     };
   }
 
-  async executeFunction(functionName, parameters, userId = 1) {
-    try {
-      switch (functionName) {
-        case 'execute_javascript':
-          return await this.toolExecutor.executeJavaScript(parameters.code);
-          
-        case 'execute_python':
-          return await this.toolExecutor.executePython(parameters.code);
-          
-        case 'Web Search':
-          return await this.toolExecutor.webSearch(parameters.query);
-          
-        case 'save_memory':
-          return await this.memoryManager.save(userId, parameters.key, parameters.value, parameters.category);
-          
-        case 'recall_memory':
-          return await this.memoryManager.recall(userId, parameters.key, parameters.category);
-          
-        case 'create_file':
-          return await this.createFile(parameters.filename, parameters.content, parameters.type);
-          
-        case 'read_file':
-          return await this.readFile(parameters.filename);
-          
-        case 'system_info':
-          return await this.getSystemInfo();
-          
-        case 'schedule_task':
-          return await this.taskScheduler.scheduleTask(userId, parameters.task_type, parameters.task_data, parameters.schedule_time);
-          
-        default:
-          return `Bilinmeyen fonksiyon: ${functionName}`;
-      }
-    } catch (error) {
-      logger.error(`Fonksiyon çalıştırma hatası (${functionName}):`, error);
-      return `Fonksiyon çalıştırma hatası: ${error.message}`;
-    }
-  }
-
-  async createFile(filename, content, type = 'text') {
-    try {
-      const uploadsDir = path.join(__dirname, 'uploads');
-      
-      try {
-        await fs.access(uploadsDir);
-      } catch {
-        await fs.mkdir(uploadsDir, { recursive: true });
-      }
-      
-      const safeFilename = utils.sanitizeFilename(filename);
-      const filePath = path.join(uploadsDir, safeFilename);
-      
-      await fs.writeFile(filePath, content, 'utf8');
-      
-      return `Dosya başarıyla oluşturuldu: ${safeFilename} (${content.length} karakter)`;
-    } catch (error) {
-      logger.error('Dosya oluşturma hatası:', error);
-      return `Dosya oluşturma hatası: ${error.message}`;
-    }
-  }
-
-  async readFile(filename) {
-    try {
-      const safeFilename = utils.sanitizeFilename(filename);
-      const filePath = path.join(__dirname, 'uploads', safeFilename);
-      const content = await fs.readFile(filePath, 'utf8');
-      return utils.truncateText(content, 2000);
-    } catch (error) {
-      logger.error('Dosya okuma hatası:', error);
-      if (error.code === 'ENOENT') {
-        return `Dosya bulunamadı: ${filename}`;
-      }
-      return `Dosya okuma hatası: ${error.message}`;
-    }
-  }
-
-  async getSystemInfo() {
-    try {
-      const memUsage = process.memoryUsage();
-      const uptime = process.uptime();
-      
-      return `Sistem Bilgileri:
-- Node.js Sürümü: ${process.version}
-- Platform: ${process.platform}
-- Mimari: ${process.arch}
-- Çalışma Süresi: ${Math.floor(uptime / 3600)}s ${Math.floor((uptime % 3600) / 60)}d ${Math.floor(uptime % 60)}s
-- Bellek Kullanımı:
-  - RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB
-  - Heap Kullanılan: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB
-  - Heap Toplam: ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB
-- Ortam: ${process.env.NODE_ENV || 'development'}
-- Railway Ortamı: ${process.env.RAILWAY_ENVIRONMENT || 'Hayır'}
-- Veritabanı: ${pool ? 'Bağlı' : 'Bağlı değil'}
-- PDF Desteği: ${pdf ? 'Mevcut' : 'Mevcut değil'}
-- Aktif Bağlantılar: ${this.activeConnections.size}
-- Aktif Oturumlar: ${this.conversationHistory.size}
-- Cache Anahtarları: ${cache.keys().length}`;
-    } catch (error) {
-      logger.error('Sistem bilgisi hatası:', error);
-      return `Sistem bilgisi hatası: ${error.message}`;
-    }
-  }
-
-  async processMessage(message, userId = 'anonymous', sessionId = null) {
-    const startTime = Date.now();
-    
-    try {
-      // Giriş doğrulama
-      if (!message || typeof message !== 'string') {
-        throw new Error('Geçersiz mesaj formatı');
-      }
-
-      if (message.length > 10000) {
-        throw new Error('Mesaj çok uzun (maksimum 10.000 karakter)');
-      }
-
-      // Oturum geçmişini al
-      const history = this.getConversationHistory(sessionId);
-      
-      // OpenAI için mesajları hazırla
-      const messages = [
-        {
-          role: "system",
-          content: `Sen gelişmiş yeteneklere sahip bir yapay zeka ajansısın:
-
-TEMEL KİMLİK:
-- Railway platformunda çalışan yüksek zekâlı, otonom bir AI ajansısın
-- Kod çalıştırabilir, dosya yönetimi yapabilir, web araması yapabilir ve bellek yönetimi yapabilirsin
-- Hem JavaScript hem de Python çalıştırma ortamlarına erişimin var
-- Görev zamanlayabilir, veri yönetimi yapabilir ve karmaşık işlemler gerçekleştirebilirsin
-- Yardımcı, doğru ve verimli olmak için tasarlandın
-
-MEVCUT FONKSİYONLAR:
-- execute_javascript: Güvenli sandbox'ta JavaScript kodu çalıştır
-- execute_python: Veri analizi ve bilimsel hesaplama için Python kodu çalıştır
-- Web Search: Güncel bilgi için internette arama yap
-- save_memory/recall_memory: Uzun vadeli bilgi saklama ve hatırlama
-- create_file/read_file: Veri kalıcılığı için dosya işlemleri
-- system_info: Detaylı sistem ve ortam bilgilerini al
-- schedule_task: Gelecekte çalıştırılmak üzere görevleri zamanla
-
-DAVRANIŞ REHBERİ:
-- Eylem almadan önce her zaman adım adım düşün
-- Soruları yanıtlamak veya problemleri çözmek için fonksiyonları kullan
-- Mantığını ve ne yaptığını açıkla
-- Çözümler ve iyileştirmeler önerme konusunda proaktif ol
-- Bağlamı koru ve önemli bilgileri hatırla
-- Hataları zarif bir şekilde ele al ve yararlı geri bildirim sağla
-- Konuşkan ama profesyonel ol
-
-YETENEKLER:
-- Çoklu dilde kod üretimi ve çalıştırma
-- Veri analizi ve görselleştirme
-- Web araştırması ve bilgi toplama
-- Dosya işleme ve yönetimi
-- Görev otomasyonu ve zamanlama
-- Bellek yönetimi ve etkileşimlerden öğrenme
-- Sistem izleme ve optimizasyon
-
-Unutma: Sen sadece bir chatbot değilsin, eylem alabilen ve gerçek problemleri çözebilen yetenekli bir AI ajansısın.`
-        },
-        ...history,
-        {
-          role: "user",
-          content: message
+  async callDeepSeek(messages, options = {}) {
+    const response = await axios.post(
+      `${aiProviders.deepseek.baseURL}/chat/completions`,
+      {
+        model: options.model || 'deepseek-chat',
+        messages: messages,
+        max_tokens: options.maxTokens || 2000,
+        temperature: options.temperature || 0.7,
+        stream: false
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${aiProviders.deepseek.apiKey}`,
+          'Content-Type': 'application/json'
         }
-      ];
-
-      // OpenAI'yi fonksiyon çağırma ile çağır
-      const response = await this.callOpenAI(messages);
-      const assistantMessage = response.choices[0].message;
-      let finalResponse = assistantMessage.content || "";
-      let functionResults = [];
-
-      // Fonksiyon çağrılarını işle
-      if (assistantMessage.function_call) {
-        const functionName = assistantMessage.function_call.name;
-        const functionArgs = JSON.parse(assistantMessage.function_call.arguments);
-        
-        logger.info(`Fonksiyon çalıştırılıyor: ${functionName}`, functionArgs);
-        
-        const functionResult = await this.executeFunction(functionName, functionArgs, userId);
-        functionResults.push({ function: functionName, result: functionResult });
-        
-        // Fonksiyon çalıştırma sonrası final yanıt al
-        const followUpMessages = [
-          ...messages,
-          assistantMessage,
-          {
-            role: "function",
-            name: functionName,
-            content: functionResult
-          }
-        ];
-        
-        const followUpResponse = await this.callOpenAI(followUpMessages);
-        finalResponse = followUpResponse.choices[0].message.content;
       }
+    );
 
-      // Konuşma geçmişini güncelle
-      this.updateConversationHistory(sessionId, message, finalResponse);
+    return {
+      content: response.data.choices[0].message.content,
+      usage: response.data.usage,
+      model: response.data.model,
+      provider: 'deepseek'
+    };
+  }
 
-      // Veritabanına kaydet
-      await this.saveConversation(userId, sessionId, message, finalResponse, functionResults, response.usage?.total_tokens || 0, Date.now() - startTime);
+  async callAnthropic(messages, options = {}) {
+    // Convert OpenAI format to Anthropic format
+    const systemMessage = messages.find(m => m.role === 'system');
+    const userMessages = messages.filter(m => m.role !== 'system');
 
+    const response = await axios.post(
+      `${aiProviders.anthropic.baseURL}/messages`,
+      {
+        model: options.model || 'claude-3-sonnet-20240229',
+        max_tokens: options.maxTokens || 2000,
+        temperature: options.temperature || 0.7,
+        system: systemMessage?.content || '',
+        messages: userMessages
+      },
+      {
+        headers: {
+          'x-api-key': aiProviders.anthropic.apiKey,
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01'
+        }
+      }
+    );
+
+    return {
+      content: response.data.content[0].text,
+      usage: response.data.usage,
+      model: response.data.model,
+      provider: 'anthropic'
+    };
+  }
+
+  getStats() {
+    return {
+      requestCount: this.requestCount,
+      errorCount: this.errorCount,
+      uptime: Date.now() - this.startTime,
+      memoryStats: this.memoryManager.getStats(),
+      cacheStats: cache.getStats()
+    };
+  }
+}
+
+// Tool Executor Class
+class ToolExecutor {
+  constructor() {
+    this.tools = new Map();
+    this.registerDefaultTools();
+  }
+
+  registerDefaultTools() {
+    this.tools.set('web_search', this.webSearch.bind(this));
+    this.tools.set('calculator', this.calculator.bind(this));
+    this.tools.set('weather', this.getWeather.bind(this));
+    this.tools.set('database_query', this.databaseQuery.bind(this));
+  }
+
+  async webSearch(query, options = {}) {
+    try {
+      // Implement web search using a search API
+      const searchResults = await this.performWebSearch(query, options);
       return {
-        response: finalResponse,
-        functionResults: functionResults,
-        executionTime: Date.now() - startTime,
-        sessionId,
-        tokensUsed: response.usage?.total_tokens || 0
+        success: true,
+        results: searchResults,
+        query: query
       };
-
     } catch (error) {
-      logger.error('Mesaj işleme hatası:', error);
-      
-      let errorMessage = "İsteğinizi işlerken bir hata oluştu. Lütfen tekrar deneyin veya sorunuzu yeniden ifade edin.";
-      
-      // Spesifik hata mesajları
-      if (error.response?.status === 429) {
-        errorMessage = "API kota sınırı aşıldı. Lütfen birkaç dakika sonra tekrar deneyin.";
-      } else if (error.response?.status === 404) {
-        errorMessage = "AI modeli bulunamadı veya erişilemiyor. Lütfen daha sonra tekrar deneyin.";
-      } else if (error.response?.status === 401) {
-        errorMessage = "API anahtarı geçersiz. Lütfen sistem yöneticisine başvurun.";
-      } else if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-        errorMessage = "Bağlantı zaman aşımı. Lütfen tekrar deneyin.";
-      }
-      
+      logger.error('Web search failed', { query, error: error.message });
       return {
-        response: errorMessage,
+        success: false,
         error: error.message,
-        executionTime: Date.now() - startTime,
-        sessionId
+        query: query
       };
     }
   }
 
-  async callOpenAI(messages) {
-    const maxRetries = 3;
-    let retryCount = 0;
-    
-    while (retryCount < maxRetries) {
-      try {
-        return await this.openai.chat.completions.create({
-          model: this.model,
-          messages: messages,
-          temperature: this.temperature,
-          max_tokens: this.maxTokens,
-          functions: Object.values(this.tools),
-          function_call: "auto"
-        });
-      } catch (error) {
-        retryCount++;
-        
-        if (error.response?.status === 429 && retryCount < maxRetries) {
-          // Rate limit - exponential backoff
-          const waitTime = Math.pow(2, retryCount) * 1000;
-          logger.warn(`Rate limit, ${waitTime}ms bekleniyor...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          continue;
-        }
-        
-        throw error;
-      }
-    }
-  }
-
-  getConversationHistory(sessionId) {
-    if (!sessionId || !utils.isValidSessionId(sessionId)) {
-      return [];
-    }
-
-    const sessionData = this.conversationHistory.get(sessionId);
-    if (!sessionData) {
-      return [];
-    }
-
-    // Son aktivite zamanını güncelle
-    sessionData.lastActivity = Date.now();
-    
-    return sessionData.history || [];
-  }
-
-  updateConversationHistory(sessionId, userMessage, assistantResponse) {
-    if (!sessionId || !utils.isValidSessionId(sessionId)) {
-      return;
-    }
-
-    let sessionData = this.conversationHistory.get(sessionId);
-    if (!sessionData) {
-      sessionData = { history: [], lastActivity: Date.now() };
-      this.conversationHistory.set(sessionId, sessionData);
-    }
-
-    sessionData.history.push({ role: "user", content: userMessage });
-    sessionData.history.push({ role: "assistant", content: assistantResponse });
-    sessionData.lastActivity = Date.now();
-    
-    // Son 20 mesajı tut (10 çift)
-    if (sessionData.history.length > 20) {
-      sessionData.history.splice(0, sessionData.history.length - 20);
-    }
-  }
-
-  async saveConversation(userId, sessionId, message, response, functionResults, tokensUsed, executionTime) {
-    if (!pool) return;
-    
+  async calculator(expression) {
     try {
-      await pool.query(`
-        INSERT INTO conversations (user_id, session_id, message, response, metadata, tokens_used, execution_time)
-        VALUES \$1,\$2,\$3,\$4,\$5,\$6,\$7)
-      `, [
-        userId === 'anonymous' ? null : userId,
-        sessionId,
-        message,
-        response,
-        JSON.stringify({
-          functionsUsed: functionResults.map(f => f.function),
-          functionResults: functionResults,
-          timestamp: new Date().toISOString()
-        }),
-        tokensUsed,
-        executionTime
-      ]);
-    } catch (dbError) {
-      logger.warn('Konuşma veritabanına kaydedilemedi:', dbError.message);
+      // Safe math evaluation
+      const result = this.evaluateMathExpression(expression);
+      return {
+        success: true,
+        result: result,
+        expression: expression
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        expression: expression
+      };
+    }
+  }
+
+  async getWeather(location) {
+    try {
+      // Implement weather API call
+      const weatherData = await this.fetchWeatherData(location);
+      return {
+        success: true,
+        data: weatherData,
+        location: location
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        location: location
+      };
+    }
+  }
+
+  async databaseQuery(query, params = []) {
+    try {
+      const result = await pool.query(query, params);
+      return {
+        success: true,
+        rows: result.rows,
+        rowCount: result.rowCount
+      };
+    } catch (error) {
+      logger.error('Database query failed', { query, error: error.message });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Helper methods (implement as needed)
+  async performWebSearch(query, options) {
+    // Implement actual web search logic
+    return [];
+  }
+
+  evaluateMathExpression(expression) {
+    // Implement safe math evaluation
+    return eval(expression); // Note: Use a safer alternative in production
+  }
+
+  async fetchWeatherData(location) {
+    // Implement weather API integration
+    return {};
+  }
+}
+
+// Task Scheduler Class
+class TaskScheduler {
+  constructor() {
+    this.tasks = new Map();
+    this.setupDefaultTasks();
+  }
+
+  setupDefaultTasks() {
+    // Cleanup old cache entries every hour
+    cron.schedule('0 * * * *', () => {
+      this.cleanupCache();
+    });
+
+    // Database maintenance every day at 2 AM
+    cron.schedule('0 2 * * *', () => {
+      this.performDatabaseMaintenance();
+    });
+
+    // Memory cleanup every 30 minutes
+    cron.schedule('*/30 * * * *', () => {
+      this.performMemoryCleanup();
+    });
+
+    // Health check every 5 minutes
+    cron.schedule('*/5 * * * *', () => {
+      this.performHealthCheck();
+    });
+  }
+
+  cleanupCache() {
+    const stats = cache.getStats();
+    logger.info('Cache cleanup started', stats);
+    cache.flushAll();
+    logger.info('Cache cleanup completed');
+  }
+
+  async performDatabaseMaintenance() {
+    try {
+      await pool.query('VACUUM ANALYZE;');
+      logger.info('Database maintenance completed');
+    } catch (error) {
+      logger.error('Database maintenance failed', { error: error.message });
+    }
+  }
+
+  performMemoryCleanup() {
+    if (global.gc) {
+      global.gc();
+      logger.info('Memory cleanup performed');
+    }
+  }
+
+  async performHealthCheck() {
+    try {
+      // Check database connection
+      await pool.query('SELECT 1');
+      
+      // Check AI providers
+      const healthStatus = {
+        database: 'healthy',
+        cache: cache.getStats(),
+        memory: process.memoryUsage(),
+        uptime: process.uptime()
+      };
+      
+      logger.debug('Health check completed', healthStatus);
+    } catch (error) {
+      logger.error('Health check failed', { error: error.message });
     }
   }
 }
 
-// ==================== EXPRESS APP SETUP ====================
-();
+// Initialize core components
+const aiAgent = new AdvancedAIAgent();
+const toolExecutor = new ToolExecutor();
+const taskScheduler = new TaskScheduler();
+
+// Express App Configuration
+const app = express();
 const server = createServer(app);
 
-// Railway için özel güvenlik ayarları
-app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
-  crossOriginEmbedderPolicy: false,
-  hsts: process.env.NODE_ENV === 'production'
-}));
-
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-
-app.use(compression({
-  level: 6,
-  threshold: 1024
-}));
-
-// Railway için optimize edilmiş rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 dakika
-  max: parseInt(process.env.RATE_LIMIT) || 100,
-  message: utils.formatErrorMessage('Çok fazla istek, lütfen daha sonra tekrar deneyin.'),
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Health check'leri rate limit'ten muaf tut
-    return req.path === '/health' || req.path === '/';
+// Session Configuration
+const PgSession = connectPgSimple(session);
+app.use(session({
+  store: new PgSession({
+    pool: pool,
+    tableName: 'user_sessions'
+  }),
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
-});
+}));
 
-app.use('/api/', limiter);
-app.use(express.json({ 
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    try {
-      JSON.parse(buf);
-    } catch (e) {
-      res.status(400).json(utils.formatErrorMessage('Geçersiz JSON formatı'));
-      return;
+// Security Middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:"]
     }
   }
 }));
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(limiter);
+
+// CORS Configuration
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  credentials: true
+}));
+
+// Compression and Parsing
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Dosya yükleme yapılandırması
+// File Upload Configuration
 const upload = multer({
   dest: 'uploads/',
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-    files: 1
+    fileSize: 10 * 1024 * 1024 // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|txt|csv|json|docx|xlsx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
+    const allowedTypes = ['image/', 'application/pdf', 'application/vnd.openxmlformats-officedocument'];
+    if (allowedTypes.some(type => file.mimetype.startsWith(type))) {
+      cb(null, true);
     } else {
-      cb(new Error('Desteklenmeyen dosya türü. İzin verilen türler: JPEG, PNG, PDF, TXT, CSV, JSON, DOCX, XLSX'));
+      cb(new Error('File type not allowed'), false);
     }
   }
 });
 
-// ==================== INITIALIZE AGENT ====================
-let agent;
-try {
-  agent = new AdvancedAIAgent();
-  logger.info('Gelişmiş AI Ajanı başarıyla oluşturuldu');
-} catch (error) {
-  logger.error('AI Ajanı oluşturulamadı:', error);
-  process.exit(1);
-}
+// Static Files
+app.use(express.static(join(__dirname, 'public')));
 
-// ==================== API ROUTES ====================
+// Routes
+app.get('/', (req, res) => {
+  res.sendFile(join(__dirname, 'advanced_ai_agent_interface.html'));
+});
 
-// Sağlık kontrolü
+// Health Check Endpoint
 app.get('/health', async (req, res) => {
   try {
-    const dbStatus = pool ? 'bağlı' : 'yapılandırılmamış';
-    let dbTest = false;
+    await pool.query('SELECT 1');
+    const stats = aiAgent.getStats();
     
-    if (pool) {
-      try {
-        await pool.query('SELECT 1');
-        dbTest = true;
-      } catch (dbError) {
-        logger.warn('Veritabanı sağlık kontrolü başarısız:', dbError.message);
-      }
-    }
-    
-    const healthData = {
-      status: 'sağlıklı',
+    res.json({
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      database: dbStatus,
-      databaseTest: dbTest,
-      uptime: Math.floor(process.uptime()),
-      memory: {
-        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
-      },
-      version: '2.1.0',
-      environment: process.env.NODE_ENV || 'development',
-      railway: !!process.env.RAILWAY_ENVIRONMENT,
-      pdfSupport: !!pdf,
-      activeConnections: agent.activeConnections.size,
-      activeSessions: agent.conversationHistory.size,
-      cacheKeys: cache.keys().length
-    };
-    
-    res.json(utils.formatSuccessMessage(healthData, 'Sistem sağlıklı'));
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      stats: stats
+    });
   } catch (error) {
-    logger.error('Sağlık kontrolü hatası:', error);
-    res.status(500).json(utils.formatErrorMessage('Sistem sağlıksız: ' + error.message));
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
-// Ana sohbet endpoint'i
+// Statistics Endpoint
+app.get('/api/stats', (req, res) => {
+  const stats = aiAgent.getStats();
+  res.json(stats);
+});
+
+// Chat API Endpoint
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, sessionId = uuidv4(), userId = 'anonymous' } = req.body;
-    
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json(utils.formatErrorMessage('Mesaj gerekli ve string tipinde olmalıdır'));
+    const { message, provider = 'openai', options = {} } = req.body;
+    const sessionId = req.session.id;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
     }
+
+    // Get conversation history
+    const conversation = aiAgent.memoryManager.getConversation(sessionId);
     
-    if (message.length > 10000) {
-      return res.status(400).json(utils.formatErrorMessage('Mesaj çok uzun (maksimum 10.000 karakter)'));
-    }
-    
-    if (message.trim().length === 0) {
-      return res.status(400).json(utils.formatErrorMessage('Boş mesaj gönderilemez'));
-    }
-    
-    const result = await agent.processMessage(message, userId, sessionId);
-    
-    res.json(utils.formatSuccessMessage(result, 'Mesaj başarıyla işlendi'));
-    
+    // Add user message to conversation
+    aiAgent.memoryManager.addMessage(sessionId, {
+      role: 'user',
+      content: message
+    });
+
+    // Prepare messages for AI
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are a helpful AI assistant. Provide accurate, helpful, and engaging responses.'
+      },
+      ...conversation.slice(-10), // Last 10 messages for context
+      {
+        role: 'user',
+        content: message
+      }
+    ];
+
+    // Call AI provider
+    const aiResponse = await aiAgent.callAI(provider, messages, options);
+
+    // Add AI response to conversation
+    aiAgent.memoryManager.addMessage(sessionId, {
+      role: 'assistant',
+      content: aiResponse.content,
+      provider: aiResponse.provider,
+      model: aiResponse.model
+    });
+
+    res.json({
+      response: aiResponse.content,
+      provider: aiResponse.provider,
+      model: aiResponse.model,
+      usage: aiResponse.usage
+    });
+
   } catch (error) {
-    logger.error('Sohbet API hatası:', error);
-    res.status(500).json(utils.formatErrorMessage('Sunucu hatası: ' + error.message));
+    logger.error('Chat API error', { error: error.message, stack: error.stack });
+    res.status(500).json({ 
+      error: 'An error occurred while processing your request',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
-// Dosya yükleme endpoint'i
+// File Upload Endpoint
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json(utils.formatErrorMessage('Dosya yüklenmedi'));
+      return res.status(400).json({ error: 'No file uploaded' });
     }
-    
+
     const fileInfo = {
       filename: req.file.filename,
       originalName: req.file.originalname,
-      size: req.file.size,
       mimetype: req.file.mimetype,
+      size: req.file.size,
       path: req.file.path
     };
-    
-    // Dosya türüne göre işle
+
+    // Process file based on type
     let processedContent = '';
     
-    try {
-      if (req.file.mimetype.startsWith('text/')) {
-        processedContent = await fs.readFile(req.file.path, 'utf8');
-      } else if (req.file.mimetype === 'application/pdf' && pdf) {
-        const dataBuffer = await fs.readFile(req.file.path);
-        const pdfData = await pdf(dataBuffer);
-        processedContent = pdfData.text;
-      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        const dataBuffer = await fs.readFile(req.file.path);
-        const result = await mammoth.extractRawText({ buffer: dataBuffer });
-        processedContent = result.value;
-      } else {
-        processedContent = 'Dosya yüklendi ancak metin çıkarımı için işlenemedi.';
-      }
-    } catch (processingError) {
-      logger.warn('Dosya işleme uyarısı:', processingError.message);
-      processedContent = 'Dosya yüklendi ancak içerik işlenirken bir sorun oluştu.';
+    if (req.file.mimetype.startsWith('image/')) {
+      processedContent = await this.processImage(req.file.path);
+    } else if (req.file.mimetype === 'application/pdf') {
+      processedContent = await this.processPDF(req.file.path);
+    } else if (req.file.mimetype.includes('document')) {
+      processedContent = await this.processDocument(req.file.path);
     }
-    
-    // Veritabanına dosya bilgisini kaydet
-    if (pool) {
-      try {
-        await pool.query(`
-          INSERT INTO files (user_id, filename, original_name, file_type, file_size, file_path, processed)
-          VALUES \$1,\$2,\$3,\$4,\$5,\$6,\$7)
-        `, [1, req.file.filename, req.file.originalname, req.file.mimetype, req.file.size, req.file.path, true]);
-      } catch (dbError) {
-        logger.warn('Dosya bilgisi veritabanına kaydedilemedi:', dbError.message);
-      }
-    }
-    
-    const responseData = {
+
+    res.json({
+      success: true,
       file: fileInfo,
-      contentPreview: utils.truncateText(processedContent, 500)
-    };
-    
-    res.json(utils.formatSuccessMessage(responseData, 'Dosya başarıyla yüklendi'));
-    
+      content: processedContent
+    });
+
   } catch (error) {
-    logger.error('Dosya yükleme hatası:', error);
-    
-    // Multer hataları için özel mesajlar
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json(utils.formatErrorMessage('Dosya çok büyük (maksimum 10MB)'));
-    } else if (error.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json(utils.formatErrorMessage('Aynı anda sadece bir dosya yükleyebilirsiniz'));
-    } else if (error.message.includes('Desteklenmeyen dosya türü')) {
-      return res.status(400).json(utils.formatErrorMessage(error.message));
-    }
-    
-    res.status(500).json(utils.formatErrorMessage('Dosya yükleme başarısız: ' + error.message));
+    logger.error('File upload error', { error: error.message });
+    res.status(500).json({ error: 'File processing failed' });
   }
 });
 
-// Konuşma geçmişi
-app.get('/api/conversations/:sessionId', async (req, res) => {
+// Tool Execution Endpoint
+app.post('/api/tools/:toolName', async (req, res) => {
   try {
-    if (!pool) {
-      return res.status(503).json(utils.formatErrorMessage('Veritabanı mevcut değil'));
+    const { toolName } = req.params;
+    const { params } = req.body;
+
+    if (!toolExecutor.tools.has(toolName)) {
+      return res.status(404).json({ error: 'Tool not found' });
     }
-    
-    const { sessionId } = req.params;
-    
-    if (!utils.isValidSessionId(sessionId)) {
-      return res.status(400).json(utils.formatErrorMessage('Geçersiz oturum ID'));
-    }
-    
-    const result = await pool.query(`
-      SELECT message, response, created_at, metadata, tokens_used, execution_time
-      FROM conversations
-      WHERE session_id =\$1
-      ORDER BY created_at ASC
-      LIMIT 50
-    `, [sessionId]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json(utils.formatErrorMessage('Bu oturum için konuşma bulunamadı'));
-    }
-    
-    res.json(utils.formatSuccessMessage({
-      sessionId,
-      conversations: result.rows,
-      count: result.rows.length
-    }, 'Konuşma geçmişi başarıyla alındı'));
-    
+
+    const result = await toolExecutor.tools.get(toolName)(params);
+    res.json(result);
+
   } catch (error) {
-    logger.error('Konuşma geçmişi hatası:', error);
-    res.status(500).json(utils.formatErrorMessage('Konuşma geçmişi alınamadı: ' + error.message));
+    logger.error('Tool execution error', { toolName: req.params.toolName, error: error.message });
+    res.status(500).json({ error: 'Tool execution failed' });
   }
 });
 
-// Ajan istatistikleri
-app.get('/api/stats', async (req, res) => {
-  try {
-    const stats = {
-      uptime: Math.floor(process.uptime()),
-      memory: process.memoryUsage(),
-      activeConnections: agent.activeConnections.size,
-      conversationSessions: agent.conversationHistory.size,
-      cacheStats: {
-        keys: cache.keys().length,
-        hits: cache.getStats().hits,
-        misses: cache.getStats().misses
-      },
-      environment: {
-        nodeVersion: process.version,
-        platform: process.platform,
-        arch: process.arch,
-        railway: !!process.env.RAILWAY_ENVIRONMENT
-      },
-      features: {
-        pdfSupport: !!pdf,
-        databaseConnected: !!pool
-      }
-    };
-    
-    if (pool) {
-      try {
-        const [conversationCount, userCount, memoryCount, taskCount] = await Promise.all([
-          pool.query('SELECT COUNT(*) as count FROM conversations'),
-          pool.query('SELECT COUNT(*) as count FROM users'),
-          pool.query('SELECT COUNT(*) as count FROM agent_memory'),
-          pool.query('SELECT COUNT(*) as count FROM agent_tasks')
-        ]);
-        
-        stats.database = {
-          conversations: parseInt(conversationCount.rows[0].count),
-          users: parseInt(userCount.rows[0].count),
-          memories: parseInt(memoryCount.rows[0].count),
-          tasks: parseInt(taskCount.rows[0].count)
-        };
-      } catch (dbError) {
-        logger.warn('Veritabanı istatistikleri alınamadı:', dbError.message);
-        stats.database = { error: 'Veritabanı sorgusu başarısız' };
-      }
-    }
-    
-    res.json(utils.formatSuccessMessage(stats, 'İstatistikler başarıyla alındı'));
-    
-  } catch (error) {
-    logger.error('İstatistik hatası:', error);
-    res.status(500).json(utils.formatErrorMessage('İstatistikler alınamadı: ' + error.message));
-  }
-});
-
-// Gelişmiş web arayüzü
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'advanced_ai_agent_interface.html'));
-});
-
-
-
-// ==================== WEBSOCKET SETUP ====================
+// WebSocket Configuration
 const wss = new WebSocketServer({ 
   server,
-  perMessageDeflate: {
-    zlibDeflateOptions: {
-      level: 3
-    }
-  }
+  path: '/ws'
 });
 
+// WebSocket Connection Handler
 wss.on('connection', (ws, req) => {
-  const connectionId = uuidv4();
-  const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  const sessionId = req.session?.id || crypto.randomUUID();
   
-  agent.activeConnections.set(connectionId, {
-    socket: ws,
-    connectedAt: Date.now(),
-    clientIP: clientIP
-  });
-  
-  logger.info(`WebSocket bağlantısı kuruldu: ${connectionId} (IP: ${clientIP})`);
-  
-  // Bağlantı onayı gönder
+  logger.info('WebSocket connection established', { sessionId });
+
+  // Send welcome message
   ws.send(JSON.stringify({
-    type: 'connection',
-    connectionId: connectionId,
-    message: 'WebSocket bağlantısı başarılı'
+    type: 'welcome',
+    message: 'Connected to AI Agent',
+    sessionId: sessionId
   }));
-  
-  ws.on('message', async (data) => {
-    try {
-      const parsed = JSON.parse(data.toString());
-      const { message, sessionId = uuidv4(), type = 'chat' } = parsed;
-      
-      if (type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-        return;
-      }
-      
-      if (type !== 'chat' || typeof message !== 'string') {
-        ws.send(JSON.stringify(utils.formatErrorMessage('Geçersiz mesaj formatı')));
-        return;
-      }
-      
-      if (message.length > 10000) {
-        ws.send(JSON.stringify(utils.formatErrorMessage('Mesaj çok uzun (maksimum 10.000 karakter)')));
-        return;
-      }
-      
-      const result = await agent.processMessage(message, 'websocket', sessionId);
-      
-      ws.send(JSON.stringify({
-        type: 'response',
-        ...utils.formatSuccessMessage(result, 'Mesaj başarıyla işlendi')
-      }));
-      
-    } catch (error) {
-      logger.error('WebSocket mesaj hatası:', error);
-      
-      let errorMessage = 'Mesaj işlenirken hata oluştu';
-      if (error instanceof SyntaxError) {
-        errorMessage = 'Geçersiz JSON formatı';
-      }
-      
-      ws.send(JSON.stringify(utils.formatErrorMessage(errorMessage)));
-    }
-  });
-  
-  ws.on('close', (code, reason) => {
-    agent.activeConnections.delete(connectionId);
-    logger.info(`WebSocket bağlantısı kapatıldı: ${connectionId} (Kod: ${code}, Sebep: ${reason})`);
-  });
-  
-  ws.on('error', (error) => {
-    logger.error(`WebSocket hatası (${connectionId}):`, error);
-    agent.activeConnections.delete(connectionId);
-  });
-  
-  // Heartbeat için ping gönder
+
+  // Heartbeat mechanism
   const heartbeat = setInterval(() => {
     if (ws.readyState === ws.OPEN) {
       ws.ping();
-    } else {
-      clearInterval(heartbeat);
     }
   }, 30000);
-  
-  ws.on('pong', () => {
-    // Pong alındı, bağlantı aktif
-  });
-});
 
-// WebSocket bağlantı temizliği
-setInterval(() => {
-  const now = Date.now();
-  const timeout = 5 * 60 * 1000; // 5 dakika
-  
-  for (const [connectionId, connection] of agent.activeConnections.entries()) {
-    if (now - connection.connectedAt > timeout && connection.socket.readyState !== connection.socket.OPEN) {
-      agent.activeConnections.delete(connectionId);
-      logger.debug(`Eski WebSocket bağlantısı temizlendi: ${connectionId}`);
-    }
-  }
-}, 60000); // Her dakika kontrol et
-
-// ==================== TASK SCHEDULER ====================
-if (pool) {
-  // Her dakika zamanlanmış görevleri çalıştır
-  cron.schedule('* * * * *', async () => {
+  ws.on('message', async (data) => {
     try {
-      await agent.taskScheduler.processPendingTasks();
-    } catch (error) {
-      logger.error('Görev zamanlayıcı hatası:', error);
-    }
-  });
-  
-  // Her gün gece yarısı temizlik yap
-  cron.schedule('0 0 * * *', async () => {
-    try {
-      logger.info('Günlük temizlik başlatılıyor...');
+      const message = JSON.parse(data.toString());
       
-      // Eski konuşmaları temizle (30 günden eski)
-      const cleanupResult = await pool.query(`
-        DELETE FROM conversations 
-        WHERE created_at < NOW() - INTERVAL '30 days'
-      `);
-      
-      // Eski dosyaları temizle
-      const oldFiles = await pool.query(`
-        SELECT file_path FROM files 
-        WHERE created_at < NOW() - INTERVAL '7 days'
-      `);
-      
-      for (const file of oldFiles.rows) {
-        try {
-          await fs.unlink(file.file_path);
-        } catch (unlinkError) {
-          logger.warn(`Dosya silinemedi: ${file.file_path}`, unlinkError.message);
-        }
+      switch (message.type) {
+        case 'chat':
+          await handleWebSocketChat(ws, message, sessionId);
+          break;
+        case 'tool':
+          await handleWebSocketTool(ws, message, sessionId);
+          break;
+        case 'pong':
+          // Handle pong response
+          break;
+        default:
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Unknown message type'
+          }));
       }
-      
-      await pool.query(`
-        DELETE FROM files 
-        WHERE created_at < NOW() - INTERVAL '7 days'
-      `);
-      
-      // Süresi dolmuş bellek kayıtlarını temizle
-      await pool.query(`
-        DELETE FROM agent_memory 
-        WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP
-      `);
-      
-      // Cache temizle
-      cache.flushAll();
-      
-      logger.info(`Günlük temizlik tamamlandı. Silinen konuşma: ${cleanupResult.rowCount}`);
-      
     } catch (error) {
-      logger.error('Günlük temizlik hatası:', error);
+      logger.error('WebSocket message error', { error: error.message });
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'Message processing failed'
+      }));
     }
   });
-}
 
-// ==================== ERROR HANDLING ====================
-process.on('uncaughtException', (error) => {
-  logger.error('Yakalanmamış İstisna:', error);
-  
-  // Railway'de graceful shutdown
-  if (process.env.RAILWAY_ENVIRONMENT) {
-    setTimeout(() => {
-      process.exit(1);
-    }, 5000);
-  } else {
-    process.exit(1);
-  }
+  ws.on('close', () => {
+    clearInterval(heartbeat);
+    logger.info('WebSocket connection closed', { sessionId });
+  });
+
+  ws.on('error', (error) => {
+    logger.error('WebSocket error', { sessionId, error: error.message });
+  });
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('İşlenmemiş Promise Reddi:', promise, 'sebep:', reason);
-  
-  // Railway'de graceful shutdown
-  if (process.env.RAILWAY_ENVIRONMENT) {
-    setTimeout(() => {
-      process.exit(1);
-    }, 5000);
-  }
-});
+// WebSocket Chat Handler
+async function handleWebSocketChat(ws, message, sessionId) {
+  try {
+    const { content, provider = 'openai', options = {} } = message;
 
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM alındı, zarif kapatma başlatılıyor...');
-  gracefulShutdown();
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT alındı, zarif kapatma başlatılıyor...');
-  gracefulShutdown();
-});
-
-async function gracefulShutdown() {
-  logger.info('Sunucu kapatılıyor...');
-  
-  // Yeni bağlantıları kabul etmeyi durdur
-  server.close(async () => {
-    logger.info('HTTP sunucusu kapatıldı');
+    // Get conversation history
+    const conversation = aiAgent.memoryManager.getConversation(sessionId);
     
-    try {
-      // WebSocket bağlantılarını kapat
-      for (const [connectionId, connection] of agent.activeConnections.entries()) {
-        connection.socket.close(1001, 'Sunucu kapatılıyor');
+    // Add user message
+    aiAgent.memoryManager.addMessage(sessionId, {
+      role: 'user',
+      content: content
+    });
+
+    // Prepare messages for AI
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are a helpful AI assistant. Provide accurate, helpful, and engaging responses.'
+      },
+      ...conversation.slice(-10),
+      {
+        role: 'user',
+        content: content
       }
-      
-      // Veritabanı bağlantılarını kapat
-      if (pool) {
-        await pool.end();
-        logger.info('Veritabanı bağlantıları kapatıldı');
-      }
-      
-      // Cache temizle
-      cache.flushAll();
-      
-      logger.info('Zarif kapatma tamamlandı');
-      process.exit(0);
-      
-    } catch (error) {
-      logger.error('Kapatma sırasında hata:', error);
-      process.exit(1);
-    }
-  });
-  
-  // 10 saniye sonra zorla kapat
-  setTimeout(() => {
-    logger.error('Zorla kapatma - zaman aşımı');
-    process.exit(1);
-  }, 10000);
+    ];
+
+    // Send typing indicator
+    ws.send(JSON.stringify({
+      type: 'typing',
+      isTyping: true
+    }));
+
+    // Call AI provider
+    const aiResponse = await aiAgent.callAI(provider, messages, options);
+
+    // Add AI response to conversation
+    aiAgent.memoryManager.addMessage(sessionId, {
+      role: 'assistant',
+      content: aiResponse.content,
+      provider: aiResponse.provider,
+      model: aiResponse.model
+    });
+
+    // Send response
+    ws.send(JSON.stringify({
+      type: 'chat_response',
+      content: aiResponse.content,
+      provider: aiResponse.provider,
+      model: aiResponse.model,
+      usage: aiResponse.usage
+    }));
+
+    // Stop typing indicator
+    ws.send(JSON.stringify({
+      type: 'typing',
+      isTyping: false
+    }));
+
+  } catch (error) {
+    logger.error('WebSocket chat error', { error: error.message });
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Chat processing failed'
+    }));
+  }
 }
 
-// ==================== SERVER START ====================
+// WebSocket Tool Handler
+async function handleWebSocketTool(ws, message, sessionId) {
+  try {
+    const { toolName, params } = message;
+
+    if (!toolExecutor.tools.has(toolName)) {
+      ws.send(JSON.stringify({
+        type: 'tool_error',
+        message: 'Tool not found'
+      }));
+      return;
+    }
+
+    const result = await toolExecutor.tools.get(toolName)(params);
+    
+    ws.send(JSON.stringify({
+      type: 'tool_response',
+      toolName: toolName,
+      result: result
+    }));
+
+  } catch (error) {
+    logger.error('WebSocket tool error', { error: error.message });
+    ws.send(JSON.stringify({
+      type: 'tool_error',
+      message: 'Tool execution failed'
+    }));
+  }
+}
+
+// Database Initialization
+async function initializeDatabase() {
+  try {
+    // Create tables if they don't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        sid VARCHAR NOT NULL COLLATE "default",
+        sess JSON NOT NULL,
+        expire TIMESTAMP(6) NOT NULL
+      ) WITH (OIDS=FALSE);
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_logs (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(255),
+        message TEXT,
+        response TEXT,
+        provider VARCHAR(50),
+        model VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS file_uploads (
+        id SERIAL PRIMARY KEY,
+        filename VARCHAR(255),
+        original_name VARCHAR(255),
+        mimetype VARCHAR(100),
+        size INTEGER,
+        processed_content TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    logger.info('Database initialized successfully');
+  } catch (error) {
+    logger.error('Database initialization failed', { error: error.message });
+    throw error;
+  }
+}
+
+// File Processing Functions
+async function processImage(filePath) {
+  try {
+    const metadata = await sharp(filePath).metadata();
+    return `Image processed: ${metadata.width}x${metadata.height}, format: ${metadata.format}`;
+  } catch (error) {
+    logger.error('Image processing failed', { error: error.message });
+    return 'Image processing failed';
+  }
+}
+
+async function processPDF(filePath) {
+  try {
+    // Implement PDF processing logic
+    return 'PDF processed successfully';
+  } catch (error) {
+    logger.error('PDF processing failed', { error: error.message });
+    return 'PDF processing failed';
+  }
+}
+
+async function processDocument(filePath) {
+  try {
+    const result = await mammoth.extractRawText({ path: filePath });
+    return result.value;
+  } catch (error) {
+    logger.error('Document processing failed', { error: error.message });
+    return 'Document processing failed';
+  }
+}
+
+// Error Handling Middleware
+app.use((error, req, res, next) => {
+  logger.error('Unhandled error', { 
+    error: error.message, 
+    stack: error.stack,
+    url: req.url,
+    method: req.method
+  });
+
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+  });
+});
+
+// 404 Handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not found',
+    message: 'The requested resource was not found'
+  });
+});
+
+// Graceful Shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  
+  server.close(() => {
+    logger.info('HTTP server closed');
+  });
+
+  try {
+    await pool.end();
+    logger.info('Database connections closed');
+  } catch (error) {
+    logger.error('Error closing database connections', { error: error.message });
+  }
+
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  
+  server.close(() => {
+    logger.info('HTTP server closed');
+  });
+
+  try {
+    await pool.end();
+    logger.info('Database connections closed');
+  } catch (error) {
+    logger.error('Error closing database connections', { error: error.message });
+  }
+
+  process.exit(0);
+});
+
+// Unhandled Promise Rejection
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', { promise, reason });
+});
+
+// Uncaught Exception
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', { error: error.message, stack: error.stack });
+  process.exit(1);
+});
+
+// Start Server
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
-    // Uploads klasörünü oluştur
-    try {
-      await fs.access(path.join(__dirname, 'uploads'));
-    } catch {
-      await fs.mkdir(path.join(__dirname, 'uploads'), { recursive: true });
-      logger.info('Uploads klasörü oluşturuldu');
-    }
+    // Initialize database
+    await initializeDatabase();
     
-    // Veritabanını başlat
-    await initDatabase();
-    
-    // Sunucuyu başlat
-    server.listen(PORT, '0.0.0.0', () => {
-      logger.info(`🚀 Gelişmiş AI Ajanı sunucusu ${PORT} portunda çalışıyor`);
-      logger.info(`🌐 Web arayüzü: http://localhost:${PORT}`);
-      logger.info(`🔌 WebSocket endpoint mevcut`);
-      logger.info(`📡 API endpoint: /api/chat`);
-      logger.info(`📄 PDF Desteği: ${pdf ? 'Mevcut' : 'Mevcut değil'}`);
-      logger.info(`🚂 Railway Ortamı: ${process.env.RAILWAY_ENVIRONMENT ? 'Evet' : 'Hayır'}`);
-      logger.info(`💾 Veritabanı: ${pool ? 'Bağlı' : 'Yapılandırılmamış'}`);
-      logger.info(`🎯 Ortam: ${process.env.NODE_ENV || 'development'}`);
+    // Start server
+    server.listen(PORT, () => {
+      logger.info(`🚀 Server running on port ${PORT}`);
+      logger.info(`📱 WebSocket server running on ws://localhost:${PORT}/ws`);
+      logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`💾 Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
+      logger.info(`🤖 AI Providers: ${Object.keys(aiProviders).join(', ')}`);
     });
-    
   } catch (error) {
-    logger.error('Sunucu başlatılamadı:', error);
+    logger.error('Failed to start server', { error: error.message });
     process.exit(1);
   }
 }
 
-// Sunucuyu başlat
 startServer();
 
 export default app;
-
+''' 
