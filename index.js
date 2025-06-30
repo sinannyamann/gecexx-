@@ -1474,8 +1474,8 @@ app.get('/api/stats', async (req, res) => {
 
 // Gelişmiş web arayüzü
 app.get('/', (req, res) => {
-  const sessionId = uuidv4();
-  res.send(`<!DOCTYPE html>
+  res.sendFile(path.join(__dirname, 'advanced_ai_agent_interface.html'));
+});
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
