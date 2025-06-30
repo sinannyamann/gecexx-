@@ -1,5 +1,4 @@
-# Create the final, complete index.js file with all features
-final_code = '''import express from 'express';
+import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import pkg from 'pg';
