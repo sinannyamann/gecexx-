@@ -1,0 +1,1474 @@
+html_content = '''<!DOCTYPE html>
+<html lang="tr">
+<kafa>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=cihaz-genişliği, başlangıç-ölçeği=1.0">
+    <title>Gelişmiş AI Ajansı - Premium</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stil sayfası">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <stil>
+        :kök {
+            --birincil-renk: #6366f1;
+            --birincil-karanlık: #4f46e5;
+            --ikincil-renk: #8b5cf6;
+            --vurgu-rengi: #06b6d4;
+            --başarı-rengi: #10b981;
+            --uyarı-rengi: #f59e0b;
+            --hata-rengi: #ef4444;
+            --bg-birincil: #0f172a;
+            --bg-ikincil: #1e293b;
+            --bg-üçüncül: #334155;
+            --metin-birincil: #f8fafc;
+            --metin-ikincil: #cbd5e1;
+            --metin-sessiz: #64748b;
+            --sınır-rengi: #475569;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0,05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0,1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0,1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0,1);
+        }
+
+        * {
+            marj: 0;
+            dolgu: 0;
+            kutu boyutlandırma: sınır kutusu;
+        }
+
+        vücut {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            arka plan: var(--bg-birincil);
+            renk: var(--text-primary);
+            satır yüksekliği: 1.6;
+            taşma-x: gizli;
+        }
+
+        /* Ana Düzeni */
+        .uygulama-konteyneri {
+            görüntüleme: esnek;
+            yükseklik: 100vh;
+            konum: göreli;
+        }
+
+        /* Kenar Çubuğu */
+        .kenar çubuğu {
+            genişlik: 280px;
+            arka plan: var(--bg-ikincil);
+            border-right: 1px katı var(--border-color);
+            görüntüleme: esnek;
+            esnek-yön: sütun;
+            geçiş: dönüşüm 0,3 sn kolaylık;
+            z-indeksi: 1000;
+        }
+
+        .kenar çubuğu başlığı {
+            dolgu: 1.5rem;
+            border-bottom: 1px katı var(--border-color);
+        }
+
+        .logosu {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.75rem;
+            yazı tipi boyutu: 1.25rem;
+            yazı tipi ağırlığı: 700;
+            renk: var(--text-primary);
+        }
+
+        .logo-simgesi {
+            genişlik: 32px;
+            yükseklik: 32px;
+            arka plan: doğrusal-eğim(135 derece, var(--birincil-renk), var(--ikincil-renk));
+            sınır yarıçapı: 8px;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            renk: beyaz;
+        }
+
+        .kenar çubuğu-nav {
+            esneklik: 1;
+            dolgu: 1rem;
+            taşma-y: otomatik;
+        }
+
+        .nav-bölüm {
+            alt kenar boşluğu: 2rem;
+        }
+
+        .nav-başlık {
+            yazı tipi boyutu: 0.75rem;
+            yazı tipi ağırlığı: 600;
+            metin-dönüşümü: büyük harf;
+            renk: var(--text-muted);
+            alt kenar boşluğu: 0.5rem;
+            harf aralığı: 0,05em;
+        }
+
+        .nav-öğesi {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.75rem;
+            dolgu: 0.75rem;
+            sınır yarıçapı: 8px;
+            renk: var(--text-secondary);
+            metin-dekorasyonu: yok;
+            geçiş: hepsi 0,2 saniyelik kolaylık;
+            alt kenar boşluğu: 0.25rem;
+            imleç: işaretçi;
+        }
+
+        .nav-öğesi:üzerinde gezinme {
+            arka plan: var(--bg-tersiyer);
+            renk: var(--text-primary);
+        }
+
+        .nav-öğesi.aktif {
+            arka plan: var(--primary-color);
+            renk: beyaz;
+        }
+
+        .nav-öğesi i {
+            genişlik: 16px;
+            metin hizalama: merkez;
+        }
+
+        /* Ana İçerik */
+        .ana-içerik {
+            esneklik: 1;
+            görüntüleme: esnek;
+            esnek-yön: sütun;
+            taşma: gizli;
+        }
+
+        /* Başlık */
+        .başlık {
+            arka plan: var(--bg-ikincil);
+            border-bottom: 1px katı var(--border-color);
+            dolgu: 1rem 1.5rem;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-koy: boşluk-arası;
+        }
+
+        .başlık-sol {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 1rem;
+        }
+
+        .mobil-menü-btn {
+            görüntüleme: yok;
+            arka plan: yok;
+            sınır: yok;
+            renk: var(--text-primary);
+            yazı tipi boyutu: 1.25rem;
+            imleç: işaretçi;
+            dolgu: 0.5rem;
+            sınır yarıçapı: 6px;
+            geçiş: arka plan rengi 0,2 sn kolaylık;
+        }
+
+        .mobil-menü-btn:hover {
+            arka plan: var(--bg-tersiyer);
+        }
+
+        .sayfa-başlığı {
+            yazı tipi boyutu: 1.5rem;
+            yazı tipi ağırlığı: 600;
+            renk: var(--text-primary);
+        }
+
+        .başlık-sağ {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 1rem;
+        }
+
+        .durum-göstergesi {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.5rem;
+            dolgu: 0.5rem 1rem;
+            arka plan: var(--bg-tersiyer);
+            sınır yarıçapı: 20px;
+            yazı tipi boyutu: 0.875rem;
+        }
+
+        .durum-noktası {
+            genişlik: 8px;
+            yükseklik: 8px;
+            sınır yarıçapı: %50;
+            arka plan: var(--success-color);
+            animasyon: nabız 2sn sonsuz;
+        }
+
+        @keyframes nabız {
+            %0, %100 { opaklık: 1; }
+            %50 { opaklık: 0,5; }
+        }
+
+        /* Sohbet Konteyneri */
+        .sohbet-konteyneri {
+            esneklik: 1;
+            görüntüleme: esnek;
+            esnek-yön: sütun;
+            taşma: gizli;
+        }
+
+        .mesajlar-alanı {
+            esneklik: 1;
+            taşma-y: otomatik;
+            dolgu: 1.5rem;
+            kaydırma davranışı: pürüzsüz;
+        }
+
+        .mesajlar-alanı::-webkit-kaydırma çubuğu {
+            genişlik: 6px;
+        }
+
+        .mesajlar-alanı::-webkit-kaydırma çubuğu-izi {
+            arka plan: var(--bg-ikincil);
+        }
+
+        .mesajlar-alanı::-webkit-kaydırma çubuğu-küçük resim {
+            arka plan: var(--border-color);
+            sınır yarıçapı: 3px;
+        }
+
+        .mesajlar-alanı::-webkit-kaydırma çubuğu-başparmak:üzerinde gezdir {
+            arka plan: var(--text-muted);
+        }
+
+        /* Mesajlar */
+        .mesaj {
+            görüntüleme: esnek;
+            alt kenar boşluğu: 1.5rem;
+            animasyon: slideIn 0.3sn kolay çıkış;
+        }
+
+        @keyframes slaytİçi {
+            itibaren {
+                opaklık: 0;
+                dönüştür: translateY(20px);
+            }
+            ile {
+                opaklık: 1;
+                dönüştür: translateY(0);
+            }
+        }
+
+        .mesaj.kullanıcı {
+            içeriği-haklı-koy: esnek-son;
+        }
+
+        .mesaj-avatar {
+            genişlik: 40px;
+            yükseklik: 40px;
+            sınır yarıçapı: %50;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            yazı tipi ağırlığı: 600;
+            yazı tipi boyutu: 0.875rem;
+            sağ kenar boşluğu: 0.75rem;
+            esneklik-küçültme: 0;
+        }
+
+        .mesaj.kullanıcı .mesaj-avatar {
+            arka plan: doğrusal-eğim(135 derece, var(--birincil-renk), var(--ikincil-renk));
+            renk: beyaz;
+            sağ kenar boşluğu: 0;
+            sol kenar boşluğu: 0.75rem;
+            sıra: 2;
+        }
+
+        .mesaj.agent .mesaj-avatar {
+            arka plan: var(--bg-tersiyer);
+            renk: var(--text-primary);
+        }
+
+        .mesaj-içeriği {
+            maksimum genişlik: %70;
+            arka plan: var(--bg-ikincil);
+            sınır yarıçapı: 16px;
+            dolgu: 1rem 1.25rem;
+            konum: göreli;
+            kutu-gölgesi: var(--shadow-sm);
+        }
+
+        .mesaj.kullanıcı .mesaj-içeriği {
+            arka plan: doğrusal-gradyan(135 derece, var(--birincil-renk), var(--birincil-koyu));
+            renk: beyaz;
+            border-bottom-right-radius: 4px;
+        }
+
+        .mesaj.agent .mesaj-içeriği {
+            sınır-alt-sol-yarıçapı: 4px;
+            kenarlık: 1px katı var(--border-color);
+        }
+
+        .mesaj-zamanı {
+            yazı tipi boyutu: 0.75rem;
+            renk: var(--text-muted);
+            kenar boşluğu-üst: 0.5rem;
+            görüntüleme: blok;
+        }
+
+        .mesaj.kullanıcı .mesaj-zamanı {
+            renk: rgba(255, 255, 255, 0,7);
+        }
+
+        /* Kod blokları */
+        .mesaj-içeriği ön {
+            arka plan: var(--bg-birincil);
+            kenarlık: 1px katı var(--border-color);
+            sınır yarıçapı: 8px;
+            dolgu: 1rem;
+            marj: 0.75rem 0;
+            taşma-x: otomatik;
+            yazı tipi ailesi: 'Monako', 'Menlo', 'Ubuntu Mono', tek aralıklı;
+            yazı tipi boyutu: 0.875rem;
+            satır yüksekliği: 1.5;
+        }
+
+        .mesaj-içerik kodu {
+            arka plan: var(--bg-birincil);
+            dolgu: 0,25rem 0,5rem;
+            sınır yarıçapı: 4px;
+            yazı tipi ailesi: 'Monako', 'Menlo', 'Ubuntu Mono', tek aralıklı;
+            yazı tipi boyutu: 0.875rem;
+            kenarlık: 1px katı var(--border-color);
+        }
+
+        /* Fonksiyon sonuçları */
+        .fonksiyon-sonucu {
+            arka plan: var(--bg-birincil);
+            sınır: 1px katı var(--vurgu-rengi);
+            sınır yarıçapı: 8px;
+            dolgu: 1rem;
+            marj: 0.75rem 0;
+        }
+
+        .fonksiyon-başlığı {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.5rem;
+            yazı tipi ağırlığı: 600;
+            renk: var(--vurgu-rengi);
+            alt kenar boşluğu: 0.5rem;
+            yazı tipi boyutu: 0.875rem;
+        }
+
+        .fonksiyon-içeriği {
+            yazı tipi ailesi: 'Monako', 'Menlo', 'Ubuntu Mono', tek aralıklı;
+            yazı tipi boyutu: 0.875rem;
+            satır yüksekliği: 1.5;
+            boşluk: ön-sarma;
+        }
+
+        /* Yazma göstergesi */
+        .yazma-göstergesi {
+            görüntüleme: yok;
+            öğeleri hizala: merkez;
+            boşluk: 0.75rem;
+            alt kenar boşluğu: 1.5rem;
+        }
+
+        .yazma-avatar {
+            genişlik: 40px;
+            yükseklik: 40px;
+            sınır yarıçapı: %50;
+            arka plan: var(--bg-tersiyer);
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            renk: var(--text-primary);
+        }
+
+        .yazma-içeriği {
+            arka plan: var(--bg-ikincil);
+            kenarlık: 1px katı var(--border-color);
+            sınır yarıçapı: 16px;
+            sınır-alt-sol-yarıçapı: 4px;
+            dolgu: 1rem 1.25rem;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.5rem;
+        }
+
+        .yazma-noktaları {
+            görüntüleme: esnek;
+            boşluk: 0.25rem;
+        }
+
+        .yazma-noktası {
+            genişlik: 8px;
+            yükseklik: 8px;
+            sınır yarıçapı: %50;
+            arka plan: var(--text-muted);
+            animasyon: 1.4sn sonsuz yazma-çıkış kolaylığı;
+        }
+
+        .typing-dot:nth-child(1) { animasyon gecikmesi: -0,32sn; }
+        .typing-dot:nth-child(2) { animasyon gecikmesi: -0.16sn; }
+
+        @keyframes yazarak {
+            %0, %80, %100 {
+                dönüştür: ölçek(0.8);
+                opaklık: 0,5;
+            }
+            %40 {
+                dönüştür: ölçek(1);
+                opaklık: 1;
+            }
+        }
+
+        /* Giriş Alanı */
+        .giriş-alanı {
+            arka plan: var(--bg-ikincil);
+            sınır-üstü: 1px katı var(--sınır-rengi);
+            dolgu: 1.5rem;
+        }
+
+        .giriş-konteyneri {
+            görüntüleme: esnek;
+            hizalama-öğeleri: esnek-son;
+            boşluk: 1rem;
+            maksimum genişlik: %100;
+        }
+
+        .giriş-sarmalayıcı {
+            esneklik: 1;
+            konum: göreli;
+        }
+
+        .mesaj-girişi {
+            genişlik: %100;
+            min-yükseklik: 48px;
+            maksimum yükseklik: 120 piksel;
+            dolgu: 0.75rem 3rem 0.75rem 1rem;
+            arka plan: var(--bg-birincil);
+            sınır: 2px katı var(--border-color);
+            sınır yarıçapı: 24px;
+            renk: var(--text-primary);
+            yazı tipi boyutu: 0.875rem;
+            font-family: miras;
+            yeniden boyutlandırma: yok;
+            ana hatlar: yok;
+            geçiş: hepsi 0,2 saniyelik kolaylık;
+            satır yüksekliği: 1.5;
+        }
+
+        .mesaj-girişi:odak {
+            sınır-rengi: var(--primary-color);
+            kutu-gölgesi: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .mesaj-girişi::yer tutucu {
+            renk: var(--text-muted);
+        }
+
+        .giriş-eylemleri {
+            konum: mutlak;
+            sağ: 0.5rem;
+            alt: 0.5rem;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.5rem;
+        }
+
+        .eylem-btn {
+            genişlik: 32px;
+            yükseklik: 32px;
+            sınır: yok;
+            sınır yarıçapı: %50;
+            arka plan: var(--bg-tersiyer);
+            renk: var(--text-secondary);
+            imleç: işaretçi;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            geçiş: hepsi 0,2 saniyelik kolaylık;
+            yazı tipi boyutu: 0.875rem;
+        }
+
+        .eylem-btn:üzerinde durma {
+            arka plan: var(--primary-color);
+            renk: beyaz;
+        }
+
+        .gönder-btn {
+            genişlik: 48px;
+            yükseklik: 48px;
+            sınır: yok;
+            sınır yarıçapı: %50;
+            arka plan: doğrusal-gradyan(135 derece, var(--birincil-renk), var(--birincil-koyu));
+            renk: beyaz;
+            imleç: işaretçi;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            geçiş: hepsi 0,2 saniyelik kolaylık;
+            kutu-gölgesi: var(--shadow-md);
+        }
+
+        .gönder-btn:hover:değil(:devre dışı) {
+            dönüştür: translateY(-2px);
+            kutu-gölgesi: var(--shadow-lg);
+        }
+
+        .gönder-btn:devre dışı {
+            opaklık: 0,5;
+            imleç: izin verilmiyor;
+            dönüşüm: hiçbiri;
+        }
+
+        /* Dosya Yükleme */
+        .dosya-yükleme {
+            görüntüleme: yok;
+        }
+
+        .dosya-önizleme {
+            görüntüleme: yok;
+            arka plan: var(--bg-tersiyer);
+            sınır yarıçapı: 8px;
+            dolgu: 0.75rem;
+            alt kenar boşluğu: 1rem;
+            kenarlık: 1px katı var(--border-color);
+        }
+
+        .dosya-bilgisi {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-koy: boşluk-arası;
+        }
+
+        .dosya-ayrıntıları {
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.5rem;
+            yazı tipi boyutu: 0.875rem;
+        }
+
+        .dosya-kaldır {
+            arka plan: yok;
+            sınır: yok;
+            renk: var(--error-color);
+            imleç: işaretçi;
+            dolgu: 0.25rem;
+            sınır yarıçapı: 4px;
+            geçiş: arka plan rengi 0,2 sn kolaylık;
+        }
+
+        .dosya-kaldır:hover {
+            arka plan: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Uyarılar */
+        .uyarı {
+            dolgu: 1rem;
+            sınır yarıçapı: 8px;
+            alt kenar boşluğu: 1rem;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            boşluk: 0.75rem;
+            yazı tipi boyutu: 0.875rem;
+            animasyon: slideIn 0.3sn kolay çıkış;
+        }
+
+        .uyarı-başarısı {
+            arka plan: rgba(16, 185, 129, 0.1);
+            sınır: 1px katı var(--success-color);
+            renk: var(--success-color);
+        }
+
+        .uyarı-hata {
+            arka plan: rgba(239, 68, 68, 0.1);
+            sınır: 1px katı var(--error-color);
+            renk: var(--error-color);
+        }
+
+        .uyarı-uyarı {
+            arka plan: rgba(245, 158, 11, 0.1);
+            sınır: 1px katı var(--uyarı-rengi);
+            renk: var(--uyarı-rengi);
+        }
+
+        /* Durumlar yükleniyor */
+        .yükleniyor {
+            opaklık: 0,7;
+            işaretçi-olayları: yok;
+        }
+
+        .döndürücü {
+            genişlik: 20px;
+            yükseklik: 20px;
+            sınır: 2px katı var(--border-color);
+            sınır-üstü: 2px katı var(--primary-color);
+            sınır yarıçapı: %50;
+            animasyon: spin 1s doğrusal sonsuz;
+        }
+
+        @keyframes dönüşü {
+            0% { dönüşüm: döndür(0 derece); }
+            %100 { dönüştür: döndür(360 derece); }
+        }
+
+        /* Hoş Geldiniz Ekranı */
+        .hoş geldiniz ekranı {
+            görüntüleme: esnek;
+            esnek-yön: sütun;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            yükseklik: %100;
+            metin hizalama: merkez;
+            dolgu: 2rem;
+        }
+
+        .hoşgeldiniz-simgesi {
+            genişlik: 80px;
+            yükseklik: 80px;
+            arka plan: doğrusal-eğim(135 derece, var(--birincil-renk), var(--ikincil-renk));
+            sınır yarıçapı: 20px;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            yazı tipi boyutu: 2rem;
+            renk: beyaz;
+            alt kenar boşluğu: 1.5rem;
+        }
+
+        .hoşgeldiniz-başlığı {
+            yazı tipi boyutu: 2rem;
+            yazı tipi ağırlığı: 700;
+            alt kenar boşluğu: 0.5rem;
+            arka plan: doğrusal-eğim(135 derece, var(--birincil-renk), var(--ikincil-renk));
+            -webkit-arkaplan-klip: metin;
+            -webkit-metin-doldurma-rengi: şeffaf;
+            arka plan-klibi: metin;
+        }
+
+        .hoşgeldiniz-altyazı {
+            yazı tipi boyutu: 1.125rem;
+            renk: var(--text-secondary);
+            alt kenar boşluğu: 2rem;
+            maksimum genişlik: 600 piksel;
+        }
+
+        .özellik-ızgarası {
+            görüntüleme: ızgara;
+            grid-şablon-sütunları: tekrarla(otomatik-uyum, minmax(250px, 1fr));
+            boşluk: 1.5rem;
+            maksimum genişlik: 800 piksel;
+            genişlik: %100;
+        }
+
+        .özellik-kartı {
+            arka plan: var(--bg-ikincil);
+            kenarlık: 1px katı var(--border-color);
+            sınır yarıçapı: 12px;
+            dolgu: 1.5rem;
+            metin hizalama: sola;
+            geçiş: hepsi 0,2 saniyelik kolaylık;
+        }
+
+        .özellik-kartı:hover {
+            sınır-rengi: var(--primary-color);
+            dönüştür: translateY(-2px);
+            kutu-gölgesi: var(--shadow-lg);
+        }
+
+        .özellik simgesi {
+            genişlik: 48px;
+            yükseklik: 48px;
+            arka plan: doğrusal-eğim(135 derece, var(--birincil-renk), var(--ikincil-renk));
+            sınır yarıçapı: 12px;
+            görüntüleme: esnek;
+            öğeleri hizala: merkez;
+            içeriği-haklı-göster: merkez;
+            renk: beyaz;
+            alt kenar boşluğu: 1rem;
+        }
+
+        .özellik-başlığı {
+            yazı tipi boyutu: 1.125rem;
+            yazı tipi ağırlığı: 600;
+            alt kenar boşluğu: 0.5rem;
+        }
+
+        .özellik-açıklaması {
+            renk: var(--text-secondary);
+            yazı tipi boyutu: 0.875rem;
+            satır yüksekliği: 1.5;
+        }
+
+        /* Duyarlı Tasarım */
+        @media (maksimum genişlik: 768px) {
+            .kenar çubuğu {
+                pozisyon: sabit;
+                sol: 0;
+                üst: 0;
+                yükseklik: 100vh;
+                dönüştür: translateX(-100%);
+                z-indeksi: 1000;
+            }
+
+            .kenar çubuğu.açık {
+                dönüştür: translateX(0);
+            }
+
+            .mobil-menü-btn {
+                görüntüleme: blok;
+            }
+
+            .ana-içerik {
+                genişlik: %100;
+            }
+
+            .mesaj-içeriği {
+                maksimum genişlik: %85;
+            }
+
+            .giriş-konteyneri {
+                boşluk: 0.75rem;
+            }
+
+            .özellik-ızgarası {
+                ızgara-şablonu-sütunları: 1fr;
+            }
+
+            .sayfa-başlığı {
+                yazı tipi boyutu: 1.25rem;
+            }
+
+            .hoşgeldiniz-başlığı {
+                yazı tipi boyutu: 1.75rem;
+            }
+
+            .hoşgeldiniz-altyazı {
+                yazı tipi boyutu: 1rem;
+            }
+        }
+
+        /* Kenar Çubuğu Kaplaması */
+        .kenar çubuğu kaplaması {
+            görüntüleme: yok;
+            pozisyon: sabit;
+            üst: 0;
+            sol: 0;
+            genişlik: %100;
+            yükseklik: %100;
+            arka plan: rgba(0, 0, 0, 0.5);
+            z-indeksi: 999;
+        }
+
+        @media (maksimum genişlik: 768px) {
+            .kenar-çubuğu-kaplaması.göster {
+                görüntüleme: blok;
+            }
+        }
+
+        /* Kaydırma Çubuğu Stili */
+        * {
+            kaydırma çubuğu genişliği: ince;
+            kaydırma çubuğu rengi: var(--border-color) var(--bg-secondary);
+        }
+
+        *::-webkit-kaydırma çubuğu {
+            genişlik: 6px;
+            yükseklik: 6px;
+        }
+
+        *::-webkit-kaydırma çubuğu-izi {
+            arka plan: var(--bg-ikincil);
+        }
+
+        *::-webkit-kaydırma çubuğu-küçük resim {
+            arka plan: var(--border-color);
+            sınır yarıçapı: 3px;
+        }
+
+        *::-webkit-kaydırma çubuğu-başparmak:üzerinde gezdir {
+            arka plan: var(--text-muted);
+        }
+
+        /* Animasyonlar */
+        .kararma {
+            animasyon: fadeIn 0.3s kolay çıkış;
+        }
+
+        @keyframes fadeIn {
+            { opaklık: 0; }'dan
+            { opaklık: 1; }
+        }
+
+        .yukarı kaydırma {
+            animasyon: slideUp 0.3sn kolay çıkış;
+        }
+
+        @keyframes slaytYukarı {
+            itibaren {
+                opaklık: 0;
+                dönüştür: translateY(20px);
+            }
+            ile {
+                opaklık: 1;
+                dönüştür: translateY(0);
+            }
+        }
+    </stil>
+</başlık>
+<gövde>
+    <div class="uygulama-konteyneri">
+        <!-- Kenar Çubuğu -->
+        <aside class="kenar çubuğu" id="kenar çubuğu">
+            <div class="kenar çubuğu başlığı">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <span>AI Ajans Pro</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-title">Ana Menü</div>
+                    <a href="#" class="nav-item active" data-page="chat">
+                        <i class="fas fa-yorumlar"></i>
+                        <span>Sohbet</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="history">
+                        <i class="fas fa-tarihi"></i>
+                        <span>Geçmiş</span>
+                    </a>
+                    <a href="#" class="nav-item" veri-sayfası="dosyalar">
+                        <i class="fas fa-klasörü"></i>
+                        <span>Dosyalar</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">Araçlar</div>
+                    <a href="#" class="nav-item" veri-sayfası="kod">
+                        <i class="fas fa-kodu"></i>
+                        <span>Kod Editörü</span>
+                    </a>
+                    <a href="#" class="nav-item" veri-sayfası="bellek">
+                        <i class="fas fa-beyin"></i>
+                        <span>Güzel</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="tasks">
+                        <i class="fas fa-görevleri"></i>
+                        <span>Görevler</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">Sistem</div>
+                    <a href="#" class="nav-item" data-page="istatistikler">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>İstatistikler</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="ayarlar">
+                        <i class="fas fa-cog"></i>
+                        <span>Ayarlar</span>
+                    </a>
+                </div>
+            </nav>
+        </kenara>
+
+        <!-- Kenar Çubuğu Kaplaması -->
+        <div class="kenar-çubuğu-üst-katmanı" id="kenar-çubuğu-üst-katmanı"></div>
+
+        <!-- Ana İçerik -->
+        <main class="ana-içerik">
+            <!-- Başlık -->
+            <başlık sınıfı="başlık">
+                <div class="header-left">
+                    <button class="mobil-menü-btn" id="mobilMenüBtn">
+                        <i class="fas fa-barlar"></i>
+                    </düğme>
+                    <h1 class="page-title" id="pageTitle">Sohbet</h1>
+                </div>
+                
+                <div class="başlık-sağ">
+                    <div class="durum-göstergesi">
+                        <div class="durum-noktası"></div>
+                        <span id="statusText">Çevrimiçi</span>
+                    </div>
+                </div>
+            </başlık>
+
+            <!-- Sohbet Konteyneri -->
+            <div class="sohbet-konteyneri" id="sohbet-konteyneri">
+                <!-- Hoş Geldiniz Ekranı -->
+                <div class="hoşgeldiniz-ekranı" id="hoşgeldinizEkranı">
+                    <div class="hoşgeldiniz-ikonu">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h2 class="welcome-title">Gelişmiş AI Ajansına Hoş Geldiniz</h2>
+                    <p class="hoşgeldiniz-altyazı">
+                        Kod çalıştırma, web arama, dosya yönetimi ve daha fazlası için güçlü yapay zeka sunabilirsiniz
+                    </p>
+                    
+                    <div class="özellik-grid">
+                        <div class="özellik-kartı">
+                            <div class="özellik-simgesi">
+                                <i class="fas fa-kodu"></i>
+                            </div>
+                            <h3 class="feature-title">Kod Çalıştırma</h3>
+                            <p class="feature-description">JavaScript ve Python kodlarını güvenli bir şekilde çalıştırıldı</p>
+                        </div>
+                        
+                        <div class="özellik-kartı">
+                            <div class="özellik-simgesi">
+                                <i class="fas fa-arama"></i>
+                            </div>
+                            <h3 class="feature-title">Web Araması</h3>
+                            <p class="feature-description">Güncel bilgilerine anında erişim sağlayın</p>
+                        </div>
+                        
+                        <div class="özellik-kartı">
+                            <div class="özellik-simgesi">
+                                <i class="fas fa-dosyası"></i>
+                            </div>
+                            <h3 class="feature-title">Dosya Yönetimi</h3>
+                            <p class="feature-description">Dosya ile tanışma, işleme ve analiz yeteneği</p>
+                        </div>
+                        
+                        <div class="özellik-kartı">
+                            <div class="özellik-simgesi">
+                                <i class="fas fa-beyin"></i>
+                            </div>
+                            <h3 class="feature-title">Akıllı Bellek</h3>
+                            <p class="feature-description">Bilgileri hatırlama ve bağlama koruma</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mesajlar Alanı -->
+                <div class="mesajlar-alanı" id="mesajlarAlanı" style="görüntüleme: yok;">
+                    <!-- Mesajlar buraya eklenecek -->
+                </div>
+
+                <!-- Yazım Göstergesi -->
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="tipleme-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="yazım-içeriği">
+                        <span style="margin-right: 0.5rem;">Yapay zeka düşünüyor</span>
+                        <div class="tipleme-noktaları">
+                            <div class="tipleme-noktası"></div>
+                            <div class="tipleme-noktası"></div>
+                            <div class="tipleme-noktası"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Giriş Alanı -->
+            <div class="giriş-alanı">
+                <!-- Dosya Önizlemesi -->
+                <div class="dosya-önizleme" id="dosyaÖnizleme">
+                    <div class="dosya-bilgisi">
+                        <div class="dosya-ayrıntıları">
+                            <i class="fas fa-dosyası"></i>
+                            <span id="fileName">dosya.txt</span>
+                            <span id="fileSize">(1,2 KB)</span>
+                        </div>
+                        <button class="dosya-kaldır" id="dosyaKaldır">
+                            <i class="fas fa-times"></i>
+                        </düğme>
+                    </div>
+                </div>
+
+                <div class="giriş-konteyneri">
+                    <div class="input-wrapper">
+                        <metin alanı 
+                            id="mesajGirişi" 
+                            sınıf="mesaj-girişi" 
+                            placeholder=Mesajınızı yazın... (Shift+Enter ile yeni satır)"
+                            satırlar="1"
+                        ></textarea>
+                        
+                        <div class="giriş-eylemleri">
+                            <input type="dosya" id="dosyaYükleme" class="dosya-yükleme" accept=".txt,.pdf,.docx,.csv,.json,.jpg,.png,.gif">
+                            <button class = "action-btn" id = "fileBtn" title = "Dosya Ekle">
+                                <i class="fas fa-kağıt ataşı"></i>
+                            </düğme>
+                        </div>
+                    </div>
+                    
+                    <button class="send-btn" id="sendBtn" title="Gönder">
+                        <i class="fas fa-kağıt-uçak"></i>
+                    </düğme>
+                </div>
+            </div>
+        </ana>
+    </div>
+
+    <!-- Komut Dosyaları -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <komut dosyası>
+        sınıf AIAgentApp {
+            yapıcı() {
+                this.sessionId = this.generateSessionId();
+                this.isProcessing = false;
+                this.currentPage = 'sohbet';
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.setupMarkdown();
+                
+                console.log('AI Agent Uygulaması oturumla başlatıldı:', this.sessionId);
+            }
+
+            SessionId oluştur() {
+                'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now(); döndür
+            }
+
+            Elementleri başlat() {
+                // DOM öğeleri
+                bu.öğeler = {
+                    kenar çubuğu: document.getElementById('kenar çubuğu'),
+                    kenar çubuğuKaplaması: document.getElementById('kenar çubuğuKaplaması'),
+                    mobilMenuBtn: document.getElementById('mobilMenuBtn'),
+                    pageTitle: document.getElementById('pageTitle'),
+                    durumMetni: document.getElementById('durumMetni'),
+                    sohbetKonteyneri: document.getElementById('sohbetKonteyneri'),
+                    hoşgeldinizEkranı: document.getElementById('hoşgeldinizEkranı'),
+                    iletiAlanı: document.getElementById('iletiAlanı'),
+                    yazımGöstergesi: document.getElementById('yazımGöstergesi'),
+                    messageInput: document.getElementById('mesajInput'),
+                    gönderBtn: document.getElementById('gönderBtn'),
+                    dosyaBtn: document.getElementById('dosyaBtn'),
+                    dosyaYükleme: document.getElementById('dosyaYükleme'),
+                    dosyaÖnizleme: document.getElementById('dosyaÖnizleme'),
+                    dosyaAdı: document.getElementById('dosyaAdı'),
+                    dosyaBoyutu: document.getElementById('dosyaBoyutu'),
+                    dosyaKaldır: document.getElementById('dosyaKaldır')
+                };
+            }
+
+            OlayDinleyicileriKurulumu() ​​{
+                // Mobil menü
+                this.elements.mobileMenuBtn.addEventListener('tıkla', () => this.toggleSidebar());
+                this.elements.sidebarOverlay.addEventListener('tıkla', () => this.closeSidebar());
+
+                // Gezinme
+                belge.querySelectorAll('.nav-item').forEach(item => {
+                    öğe.addEventListener('tıkla', (e) => {
+                        e.önlemeVarsayılanı();
+                        sabit sayfa = öğe.verikümesi.sayfa;
+                        this.navigateToPage(sayfa);
+                    });
+                });
+
+                // Mesaj girişi
+                this.elements.messageInput.addEventListener('giriş', () => this.autoResizeTextarea());
+                this.elements.messageInput.addEventListener('keydown', (e) => this.handleKeyDown(e));
+
+                // Gönder butonu
+                this.elements.sendBtn.addEventListener('tıkla', () => this.sendMessage());
+
+                // Dosya yükleme
+                this.elements.fileBtn.addEventListener('tıkla', () => this.elements.fileUpload.click());
+                this.elements.fileUpload.addEventListener('değiştir', (e) => this.handleFileUpload(e));
+                this.elements.fileRemove.addEventListener('tıkla', () => this.removeFile());
+
+                // Bağlantı durumu
+                window.addEventListener('online', () => this.updateStatus('Çevrimiçi', 'başarılı'));
+                window.addEventListener('offline', () => this.updateStatus('Çevrimdışı', 'error'));
+
+                // Enter'da form gönderimini engelle
+                belge.addEventListener('keydown', (e) => {
+                    eğer (e.anahtar === 'Enter' && e.hedef.etiketAdı !== 'TEXTAREA') {
+                        e.önlemeVarsayılanı();
+                    }
+                });
+            }
+
+            Markdown kurulumu() ​​{
+                eğer (typeof işaretli !== 'tanımsız') {
+                    işaretli.setOptions({
+                        sonlar: doğru,
+                        gfm: doğru,
+                        vurgula: fonksiyon(kod, dil) {
+                            dönüş kodu; // Sözdizimi vurgulama buraya eklenebilir
+                        }
+                    });
+                }
+            }
+
+            KenarÇubuğuGeçiş() {
+                this.elements.sidebar.classList.toggle('açık');
+                this.elements.sidebarOverlay.classList.toggle('göster');
+            }
+
+            Kenar Çubuğunu Kapat() {
+                this.elements.sidebar.classList.remove('açık');
+                this.elements.sidebarOverlay.classList.remove('göster');
+            }
+
+            sayfayagit(sayfa) {
+                // Etkin gezinme öğesini güncelle
+                belge.querySelectorAll('.nav-item').forEach(item => {
+                    öğe.classList.remove('aktif');
+                });
+                belge.querySelector(`[data-page="${page}"]`).classList.add('aktif');
+
+                // Sayfa başlığını güncelle
+                sabit başlıklar = {
+                    sohbet: 'Sohbet',
+                    tarihçe: 'Geçmiş',
+                    dosyalar: 'Dosyalar',
+                    kod: 'Kod Editörü',
+                    hafıza: 'Bellek',
+                    Görevler: 'Görevler',
+                    istatistikler: 'İstatistikler',
+                    ayarlar: 'Ayarlar'
+                };
+                this.elements.pageTitle.textContent = titles[page] || 'Sayfa Adı';
+
+                // Sohbet arayüzünü göster/gizle
+                eğer (sayfa === 'sohbet') {
+                    bu.showSohbetArayüz();
+                } başka {
+                    this.showPlaceholderPage(sayfa);
+                }
+
+                this.currentPage = sayfa;
+                bu.kenarçubuğukapat();
+            }
+
+            SohbetArayüzünügöster() {
+                this.elements.sohbetKonteyneri.stil.görüntüleme = 'esnek';
+                // Mesaj yoksa karşılama ekranını göster
+                eğer (this.elements.messagesArea.children.length === 0) {
+                    this.elements.welcomeScreen.style.display = 'esnek';
+                    this.elements.messagesArea.style.display = 'hiçbiri';
+                } başka {
+                    this.elements.welcomeScreen.style.display = 'hiçbiri';
+                    this.elements.messagesArea.style.display = 'blok';
+                }
+            }
+
+            showPlaceholderPage(sayfa) {
+                sabit başlıklar = {
+                    geçmişi: 'Konuşma Geçmişi',
+                    dosyalar: 'Dosya Yöneticisi',
+                    kod: 'Kod Editörü',
+                    bellek: 'Bellek Yöneticisi',
+                    görevler: 'Görev Zamanlayıcı',
+                    istatistikler: 'Sistem İstatistikleri',
+                    ayarlar: 'Uygulama Ayarları'
+                };
+
+                sabit açıklamalar = {
+                    geçmişi: 'Geçmiş konuşmalarınızı görüntüleyebilir ve yönetin',
+                    dosyalar: 'Yüklenen dosyalar görüntülenir ve yönetilir',
+                    code: 'Kod yazın ve çalıştırın',
+                    bellek: 'AI ajanının bellek kayıtlarını yönetin',
+                    görevler: 'Zamanlanmış görüntülerin görüntülenmesi ve yönetilmesi',
+                    istatistikler: 'Sistem performansı ve kullanım istatistikleri',
+                    ayarlar: 'Uygulama tercihlerinizi yapılandırın'
+                };
+
+                this.elements.sohbetKonteyner.innerHTML = `
+                    <div class="hoşgeldiniz-ekranı">
+                        <div class="hoşgeldiniz-ikonu">
+                            <i class="fas fa-${this.getPageIcon(sayfa)}"></i>
+                        </div>
+                        <h2 class="welcome-title">${titles[sayfa]</h2>
+                        <p class="welcome-subtitle">${descriptions[sayfa]</p>
+                        <div class="uyarı uyarı-uyarı">
+                            <i class="fas fa-info-circle"></i>
+                            Bu özellik yakında sunulacak
+                        </div>
+                    </div>
+                `;
+            }
+
+            getPageIcon(sayfa) {
+                sabit simgeler = {
+                    tarih: 'tarih',
+                    dosyalar: 'klasör',
+                    kod: 'kod',
+                    hafıza: 'beyin',
+                    görevler: 'görevler',
+                    istatistikler: 'grafik-çubuk',
+                    ayarlar: 'cog'
+                };
+                simgeleri döndür[sayfa] || 'robot';
+            }
+
+            autoResizeTextarea() {
+                sabit metin alanı = this.elements.messageInput;
+                textarea.style.height = 'otomatik';
+                textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+            }
+
+            handleKeyDown(e) {
+                eğer (e.key === 'Enter' && !e.shiftKey) {
+                    e.önlemeVarsayılanı();
+                    bu.mesajgönder();
+                }
+            }
+
+            asenkron sendMessage() {
+                sabit ileti = this.elements.messageInput.value.trim();
+                eğer (!mesaj || this.isProcessing) geri dön;
+
+                eğer (mesaj.uzunluğu > 10000) {
+                    this.showAlert('Mesaj çok uzun (maksimum 10.000 karakter)', 'error');
+                    geri dönmek;
+                }
+
+                this.isProcessing = true;
+                this.elements.sendBtn.disabled = true;
+                this.updateStatus('İşleniyor...', 'işleniyor');
+
+                // Hoş geldiniz ekranını gizle ve mesaj alanını göster
+                this.elements.welcomeScreen.style.display = 'hiçbiri';
+                this.elements.messagesArea.style.display = 'blok';
+
+                // Kullanıcı mesajı ekle
+                this.addMessage(mesaj, 'kullanıcı');
+                this.elements.messageInput.value = '';
+                this.autoResizeTextarea();
+
+                // Yazma göstergesini göster
+                bu.showTypingIndicator();
+
+                denemek {
+                    sabit yanıt = await fetch('/api/sohbet', {
+                        yöntem: 'POST',
+                        başlıklar: {
+                            'İçerik Türü': 'uygulama/json'
+                        },
+                        gövde: JSON.stringify({
+                            mesaj: mesaj,
+                            oturumKimliği: this.sessionId
+                        })
+                    });
+
+                    sabit sonuç = await response.json();
+                    bu.YazımGöstergesiniGizle();
+
+                    eğer (sonuç.başarı) {
+                        yanıtMesajı = sonuç.veri.yanıt;
+                        
+                        // Fonksiyon sonuçlarını ekle
+                        eğer (sonuç.veri.fonksiyonSonuçları && sonuç.veri.fonksiyonSonuçları.uzunluk > 0) {
+                            yanıtMesajı += this.formatFunctionResults(sonuç.veri.fonksiyonSonuçları);
+                        }
+                        
+                        this.addMessage(yanıtMesajı, 'aracı');
+                        this.updateStatus(`Yanıt ${result.data.executionTime}ms'de alındı`, 'success');
+                    } başka {
+                        this.addMessage(`❌ Hata: ${sonuç.hata}`, 'araç');
+                        this.updateStatus('Hata oluştu', 'error');
+                    }
+
+                } (hata) yakala {
+                    bu.YazımGöstergesiniGizle();
+                    
+                    let errorMessage = 'Bağlantı hatası oluştu';
+                    eğer (!navigator.onLine) {
+                        errorMessage = 'İnternet bağlantısı yok';
+                    } else if (hata.name === 'İptalHatası') {
+                        errorMessage = 'İstek zaman aşımına uğradı';
+                    }
+                    
+                    this.addMessage(`❌ ${errorMessage}`, 'araç');
+                    this.updateStatus('Bağlantı hatası', 'hata');
+                } Sonunda {
+                    this.isProcessing = false;
+                    this.elements.sendBtn.disabled = false;
+                    bu.öğeler.mesajGirişi.odak();
+                }
+            }
+
+            addMessage(içerik, gönderen) {
+                sabit messageDiv = document.createElement('div');
+                messageDiv.className = `mesaj ${gönderen}`;
+                
+                sabit avatar = belge.createElement('div');
+                avatar.className = 'mesaj-avatar';
+                avatar.innerHTML = gönderici === 'kullanıcı' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+                
+                sabit contentDiv = document.createElement('div');
+                contentDiv.className = 'mesaj-içeriği';
+                
+                // Ajan mesajları için işaretlemeyi oluştur
+                eğer (typeof işaretli !== 'tanımsız' && gönderen === 'aracı') {
+                    denemek {
+                        contentDiv.innerHTML = işaretli.parse(içerik);
+                    } yakala (e) {
+                        contentDiv.textContent = içerik;
+                    }
+                } başka {
+                    contentDiv.textContent = içerik;
+                }
+                
+                sabit zamanDiv = belge.createElement('span');
+                timeDiv.className = 'mesaj-zamanı';
+                timeDiv.textContent = yeni Tarih().toLocaleTimeString('tr-TR', { 
+                    saat: '2 haneli', 
+                    dakika: '2 basamaklı' 
+                });
+                
+                contentDiv.appendChild(timeDiv);
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(içerikDiv);
+                
+                this.elements.messagesArea.appendChild(messageDiv);
+                bu.kaydırAlta();
+            }
+
+            formatFunctionResults(sonuçlar) {
+                biçimlendirilmiş = '\\n\\n';
+                sonuçlar.forEach(sonuç => {
+                    biçimlendirilmiş += `<div class="function-result">
+                        <div class="fonksiyon-başlığı">
+                            <i class="fas fa-cog"></i>
+                            ${sonuç.fonksiyonu}
+                        </div>
+                        <div class="function-content">${sonuç.sonuç</div>
+                    </div>`;
+                });
+                biçimlendirilmiş olarak geri dön;
+            }
+
+            gösterYazımGöstergesi() {
+                this.elements.typingIndicator.style.display = 'esnek';
+                bu.kaydırAlta();
+            }
+
+            gizleYazımGöstergesi() {
+                this.elements.typingIndicator.style.display = 'hiçbiri';
+            }
+
+            Aşağı Kaydır() {
+                this.elements.messagesArea.scrollTop = this.elements.messagesArea.scrollHeight;
+            }
+
+            updateStatus(metin, tür = 'varsayılan') {
+                this.elements.durumMetni.metinİçeriği = metin;
+                
+                // 3 saniye sonra durumu sıfırla
+                eğer (tür !== 'varsayılan') {
+                    Zamanaşımı(() => {
+                        this.elements.statusText.textContent = 'Çevrimiçi';
+                    }, 3000);
+                }
+            }
+
+            asenkron handleFileUpload(e) {
+                sabit dosya = e.target.files[0];
+                eğer (!dosya) geri dön;
+
+                eğer (dosya.boyutu > 10 * 1024 * 1024) {
+                    this.showAlert('Dosya çok büyük (maksimum 10MB)', 'error');
+                    e.hedef.değer = '';
+                    geri dönmek;
+                }
+
+                // Dosya önizlemesini göster
+                this.elements.fileName.textContent = dosya.name;
+                this.elements.fileSize.textContent = `(${this.formatFileSize(dosya.size)})`;
+                this.elements.filePreview.style.display = 'blok';
+
+                const formData = new FormData();
+                formData.append('dosya', dosya);
+
+                denemek {
+                    this.updateStatus('Dosya yükleniyor...', 'işleniyor');
+                    
+                    sabit yanıt = await fetch('/api/upload', {
+                        yöntem: 'POST',
+                        gövde: formData
+                    });
+
+                    sabit sonuç = await response.json();
+                    
+                    eğer (sonuç.başarı) {
+                        const message = `📁 **Dosya yüklendi:** ${file.name}\\n\\n**İçerik kullanımı:**\\n${result.data.contentPreview}`;
+                        this.addMessage(mesaj, 'aracı');
+                        this.updateStatus('Dosya başarıyla yüklendi', 'başarılı');
+                    } başka {
+                        this.showAlert(`Dosya yükleme başarısız: ${result.error}`, 'error');
+                    }
+                } (hata) yakala {
+                    this.showAlert(`Dosya yükleme hatası: ${error.message}`, 'error');
+                } Sonunda {
+                    bu.dosyayıkaldır();
+                }
+            }
+
+            Dosyayı kaldır() {
+                this.elements.filePreview.style.display = 'hiçbiri';
+                this.elements.fileUpload.value = '';
+            }
+
+            formatFileSize(bayt) {
+                eğer (bayt === 0) '0 B' döndür;
+                sabit k = 1024;
+                sabit boyutlar = ['B', 'KB', 'MB', 'GB'];
+                sabit i = Math.floor(Math.log(bayt) / Math.log(k));
+                parseFloat((bayt / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i] döndür;
+            }
+
+            showAlert(mesaj, tür = 'bilgi') {
+                sabit alertDiv = belge.createElement('div');
+                alertDiv.className = `uyarı uyarı-${type}`;
+                
+                const icon = type === 'hata' ? 'ünlem-üçgeni' : 
+                           type === 'başarılı' ? 'check-circle' : 
+                           tür === 'uyarı' ? 'ünlem-daire' : 'bilgi-daire';
+                
+                alertDiv.innerHTML = `
+                    <i class="fas fa-${icon}"></i>
+                    <span>${mesaj</span>
+                `;
+                
+                // Mesaj alanının en üstüne ekle
+                this.elements.messagesArea.insertBefore(alertDiv, this.elements.messagesArea.firstChild);
+                
+                // 5 saniye sonra kaldır
+                Zamanaşımı(() => {
+                    eğer (alertDiv.parentNode) {
+                        warningDiv.parentNode.removeChild(alertDiv);
+                    }
+                }, 5000);
+            }
+        }
+
+        // DOM yüklendiğinde uygulamayı başlat
+        belge.addEventListener('DOMContentYüklendi', () => {
+            pencere.aiApp = yeni AIAgentApp();
+        });
+
+        // Sayfa görünürlüğü değişikliklerini yönet
+        belge.addEventListener('görünürlükdeğişimi', () => {
+            eğer (!document.gizli && window.aiApp) {
+                window.aiApp.updateStatus('Çevrimiçi', 'başarılı');
+            }
+        });
+
+        // Boşaltmadan önce işlemi gerçekleştir
+        pencere.addEventListener('önceden yükleme', (e) => {
+            eğer (window.aiApp && window.aiApp.isProcessing) {
+                e.önlemeVarsayılanı();
+                e.returnValue = 'İşlemeye devam ediyor, silmek istediğinizden emin misiniz?';
+            }
+        });
+    </script>
+</gövde>
+</html>'''
+
+# HTML sonuçlarını 
+open  ( 'advanced_ai_agent_interface.html' , 'w' , encoding= 'utf-8' ) olarak kaydedin kaydedin :
+    f.write(html_content)
