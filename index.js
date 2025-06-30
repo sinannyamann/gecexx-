@@ -1,5 +1,4 @@
 import express from 'express';
-app.use(express.static(path.join(__dirname, 'public')));
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -27,7 +26,7 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import NodeCache from 'node-cache';
 import { marked } from 'marked';
-
+const app = express
 // PDF-parse'ı dinamik olarak import et
 let pdf;
 try {
@@ -42,6 +41,7 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ==================== CACHE SETUP ====================
 const cache = new NodeCache({ 
@@ -1161,7 +1161,7 @@ Unutma: Sen sadece bir chatbot değilsin, eylem alabilen ve gerçek problemleri 
 }
 
 // ==================== EXPRESS APP SETUP ====================
-const app = express();
+();
 const server = createServer(app);
 
 // Railway için özel güvenlik ayarları
