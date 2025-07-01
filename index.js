@@ -1,5 +1,4 @@
 import express from 'express';
-app.set('trust proxy', 1);
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import pkg from 'pg';
@@ -513,6 +512,9 @@ const taskScheduler = new TaskScheduler();
 // Express App Configuration
 const app = express();
 const server = createServer(app);
+
+// ✅ Trust proxy ayarını burada ekle (app tanımlandıktan sonra)
+app.set('trust proxy', 1);
 
 // Session Configuration
 if (pool) {
