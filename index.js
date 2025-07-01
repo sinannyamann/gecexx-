@@ -1,4 +1,5 @@
 import express from 'express';
+app.set('trust proxy', 1);
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import pkg from 'pg';
