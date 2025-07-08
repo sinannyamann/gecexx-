@@ -3,31 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gelişmiş AI Ajansı - Premium</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Advanced AI Agent</title>
     <style>
-        :root {
-            --primary-color: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary-color: #8b5cf6;
-            --accent-color: #06b6d4;
-            --success-color: #10b981;
-            --warning-color: #f59e0b;
-            --error-color: #ef4444;
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-tertiary: #334155;
-            --text-primary: #f8fafc;
-            --text-secondary: #cbd5e1;
-            --text-muted: #64748b;
-            --border-color: #475569;
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -35,179 +12,43 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        /* Ana Düzen */
-        .app-container {
-            display: flex;
-            height: 100vh;
-            position: relative;
-        }
-
-        /* Kenar Çubuğu */
-        .sidebar {
-            width: 280px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-
-        .sidebar-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
         }
 
-        .sidebar-nav {
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-
-        .nav-section {
-            margin-bottom: 2rem;
-        }
-
-        .nav-title {
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-            letter-spacing: 0.05em;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            border-radius: 8px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: all 0.2s ease;
-            margin-bottom: 0.25rem;
-            cursor: pointer;
-        }
-
-        .nav-item:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
-        .nav-item.active {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .nav-item i {
-            width: 16px;
-            text-align: center;
-        }
-
-        /* Ana İçerik */
-        .main-content {
-            flex: 1;
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 800px;
+            height: 600px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
-        /* Başlık */
         .header {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 1rem 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
         }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
         }
 
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            color: var(--text-primary);
-            font-size: 1.25rem;
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 6px;
-            transition: background-color 0.2s ease;
+        .status {
+            font-size: 14px;
+            opacity: 0.9;
         }
 
-        .mobile-menu-btn:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .page-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: var(--bg-tertiary);
-            border-radius: 20px;
-            font-size: 0.875rem;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success-color);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Sohbet Konteyneri */
         .chat-container {
             flex: 1;
             display: flex;
@@ -215,1256 +56,446 @@
             overflow: hidden;
         }
 
-        .messages-area {
+        .messages {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
-            scroll-behavior: smooth;
+            padding: 20px;
+            background: #f8f9fa;
         }
 
-        .messages-area::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .messages-area::-webkit-scrollbar-track {
-            background: var(--bg-secondary);
-        }
-
-        .messages-area::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 3px;
-        }
-
-        .messages-area::-webkit-scrollbar-thumb:hover {
-            background: var(--text-muted);
-        }
-
-        /* Mesajlar */
         .message {
+            margin-bottom: 15px;
             display: flex;
-            margin-bottom: 1.5rem;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            align-items: flex-start;
         }
 
         .message.user {
             justify-content: flex-end;
         }
 
-        .message-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.875rem;
-            margin-right: 0.75rem;
-            flex-shrink: 0;
-        }
-
-        .message.user .message-avatar {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            margin-right: 0;
-            margin-left: 0.75rem;
-            order: 2;
-        }
-
-        .message.agent .message-avatar {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
         .message-content {
             max-width: 70%;
-            background: var(--bg-secondary);
-            border-radius: 16px;
-            padding: 1rem 1.25rem;
-            position: relative;
-            box-shadow: var(--shadow-sm);
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
         }
 
         .message.user .message-content {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-            border-bottom-right-radius: 4px;
         }
 
-        .message.agent .message-content {
-            border-bottom-left-radius: 4px;
-            border: 1px solid var(--border-color);
+        .message.assistant .message-content {
+            background: white;
+            border: 1px solid #e9ecef;
+            color: #333;
         }
 
-        .message-time {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 0.5rem;
-            display: block;
-        }
-
-        .message.user .message-time {
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        /* Kod blokları */
-        .message-content pre {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 0.75rem 0;
-            overflow-x: auto;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.875rem;
-            line-height: 1.5;
-        }
-
-        .message-content code {
-            background: var(--bg-primary);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.875rem;
-            border: 1px solid var(--border-color);
-        }
-
-        /* Fonksiyon sonuçları */
-        .function-result {
-            background: var(--bg-primary);
-            border: 1px solid var(--accent-color);
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 0.75rem 0;
-        }
-
-        .function-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 600;
-            color: var(--accent-color);
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .function-content {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.875rem;
-            line-height: 1.5;
-            white-space: pre-wrap;
-        }
-
-        /* Yazma göstergesi */
-        .typing-indicator {
-            display: none;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .typing-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--bg-tertiary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-primary);
-        }
-
-        .typing-content {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            border-bottom-left-radius: 4px;
-            padding: 1rem 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .typing-dots {
-            display: flex;
-            gap: 0.25rem;
-        }
-
-        .typing-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--text-muted);
-            animation: typing 1.4s infinite ease-in-out;
-        }
-
-        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes typing {
-            0%, 80%, 100% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-            40% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-
-        /* Giriş Alanı */
-        .input-area {
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border-color);
-            padding: 1.5rem;
+        .message-info {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 5px;
         }
 
         .input-container {
-            display: flex;
-            align-items: flex-end;
-            gap: 1rem;
-            max-width: 100%;
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
         }
 
-        .input-wrapper {
-            flex: 1;
-            position: relative;
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .provider-select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            font-size: 14px;
         }
 
         .message-input {
-            width: 100%;
-            min-height: 48px;
-            max-height: 120px;
-            padding: 0.75rem 3rem 0.75rem 1rem;
-            background: var(--bg-primary);
-            border: 2px solid var(--border-color);
-            border-radius: 24px;
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            font-family: inherit;
-            resize: none;
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 14px;
             outline: none;
-            transition: all 0.2s ease;
-            line-height: 1.5;
+            transition: border-color 0.3s;
         }
 
         .message-input:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            border-color: #4facfe;
         }
 
-        .message-input::placeholder {
-            color: var(--text-muted);
-        }
-
-        .input-actions {
-            position: absolute;
-            right: 0.5rem;
-            bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .action-btn {
-            width: 32px;
-            height: 32px;
-            border: none;
-            border-radius: 50%;
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            font-size: 0.875rem;
-        }
-
-        .action-btn:hover {
-            background: var(--primary-color);
+        .send-button {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-        }
-
-        .send-btn {
-            width: 48px;
-            height: 48px;
             border: none;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: white;
+            border-radius: 25px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-md);
+            font-size: 14px;
+            transition: transform 0.2s;
         }
 
-        .send-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+        .send-button:hover {
+            transform: translateY(-1px);
         }
 
-        .send-btn:disabled {
-            opacity: 0.5;
+        .send-button:disabled {
+            opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
 
-        /* Dosya Yükleme */
+        .typing-indicator {
+            display: none;
+            padding: 10px 16px;
+            color: #666;
+            font-style: italic;
+            font-size: 14px;
+        }
+
         .file-upload {
+            margin-bottom: 10px;
+        }
+
+        .file-input {
             display: none;
         }
 
-        .file-preview {
-            display: none;
-            background: var(--bg-tertiary);
-            border-radius: 8px;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .file-info {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .file-details {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .file-remove {
-            background: none;
-            border: none;
-            color: var(--error-color);
+        .file-button {
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 10px;
             cursor: pointer;
-            padding: 0.25rem;
-            border-radius: 4px;
-            transition: background-color 0.2s ease;
+            font-size: 14px;
+            transition: background-color 0.3s;
         }
 
-        .file-remove:hover {
-            background: rgba(239, 68, 68, 0.1);
+        .file-button:hover {
+            background: #e9ecef;
         }
 
-        /* Uyarılar */
-        .alert {
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 0.875rem;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        .alert-success {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid var(--success-color);
-            color: var(--success-color);
-        }
-
-        .alert-error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--error-color);
-            color: var(--error-color);
-        }
-
-        .alert-warning {
-            background: rgba(245, 158, 11, 0.1);
-            border: 1px solid var(--warning-color);
-            color: var(--warning-color);
-        }
-
-        /* Yükleme durumları */
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--border-color);
-            border-top: 2px solid var(--primary-color);
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            background: #dc3545;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .connection-status.connected {
+            background: #28a745;
         }
 
-        /* Hoş Geldiniz Ekranı */
-        .welcome-screen {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            text-align: center;
-            padding: 2rem;
-        }
-
-        .welcome-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            color: white;
-            margin-bottom: 1.5rem;
-        }
-
-        .welcome-title {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .welcome-subtitle {
-            font-size: 1.125rem;
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-            max-width: 600px;
-        }
-
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            max-width: 800px;
-            width: 100%;
-        }
-
-        .feature-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: left;
-            transition: all 0.2s ease;
-        }
-
-        .feature-card:hover {
-            border-color: var(--primary-color);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .feature-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            margin-bottom: 1rem;
-        }
-
-        .feature-title {
-            font-size: 1.125rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .feature-description {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            line-height: 1.5;
-        }
-
-        /* Responsive Tasarım */
         @media (max-width: 768px) {
-            .sidebar {
-                position: fixed;
-                left: 0;
-                top: 0;
-                height: 100vh;
-                transform: translateX(-100%);
-                z-index: 1000;
+            .container {
+                width: 95%;
+                height: 90vh;
+                border-radius: 10px;
             }
 
-            .sidebar.open {
-                transform: translateX(0);
+            .input-row {
+                flex-direction: column;
             }
 
-            .mobile-menu-btn {
-                display: block;
-            }
-
-            .main-content {
+            .provider-select {
                 width: 100%;
-            }
-
-            .message-content {
-                max-width: 85%;
-            }
-
-            .input-container {
-                gap: 0.75rem;
-            }
-
-            .feature-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .page-title {
-                font-size: 1.25rem;
-            }
-
-            .welcome-title {
-                font-size: 1.75rem;
-            }
-
-            .welcome-subtitle {
-                font-size: 1rem;
-            }
-        }
-
-        /* Kenar Çubuğu Kaplaması */
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar-overlay.show {
-                display: block;
-            }
-        }
-
-        /* Scrollbar Stili */
-        * {
-            scrollbar-width: thin;
-            scrollbar-color: var(--border-color) var(--bg-secondary);
-        }
-
-        *::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        *::-webkit-scrollbar-track {
-            background: var(--bg-secondary);
-        }
-
-        *::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 3px;
-        }
-
-        *::-webkit-scrollbar-thumb:hover {
-            background: var(--text-muted);
-        }
-
-        /* Animasyonlar */
-        .fade-in {
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .slide-up {
-            animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
             }
         }
     </style>
 </head>
 <body>
-    <div class="app-container">
-        <!-- Kenar Çubuğu -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-robot"></i>
+    <div class="container">
+        <div class="header">
+            <div class="connection-status" id="connectionStatus"></div>
+            <h1>🤖 Advanced AI Agent</h1>
+            <div class="status" id="statusText">Bağlanıyor...</div>
+        </div>
+        
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="message assistant">
+                    <div class="message-content">
+                        Merhaba! Ben gelişmiş AI asistanınızım. Size nasıl yardımcı olabilirim?
+                        <div class="message-info">AI Assistant</div>
                     </div>
-                    <span>AI Ajans Pro</span>
                 </div>
             </div>
             
-            <nav class="sidebar-nav">
-                <div class="nav-section">
-                    <div class="nav-title">Ana Menü</div>
-                    <a href="#" class="nav-item active" data-page="chat">
-                        <i class="fas fa-comments"></i>
-                        <span>Sohbet</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="history">
-                        <i class="fas fa-history"></i>
-                        <span>Geçmiş</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="files">
-                        <i class="fas fa-folder"></i>
-                        <span>Dosyalar</span>
-                    </a>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-title">Araçlar</div>
-                    <a href="#" class="nav-item" data-page="code">
-                        <i class="fas fa-code"></i>
-                        <span>Kod Editörü</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="memory">
-                        <i class="fas fa-brain"></i>
-                        <span>Bellek</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="tasks">
-                        <i class="fas fa-tasks"></i>
-                        <span>Görevler</span>
-                    </a>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-title">Sistem</div>
-                    <a href="#" class="nav-item" data-page="stats">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>İstatistikler</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="settings">
-                        <i class="fas fa-cog"></i>
-                        <span>Ayarlar</span>
-                    </a>
-                </div>
-            </nav>
-        </aside>
-
-        <!-- Kenar Çubuğu Kaplaması -->
-        <div class="sidebar-overlay" id="sidebarOverlay"></div>
-
-        <!-- Ana İçerik -->
-        <main class="main-content">
-            <!-- Başlık -->
-            <header class="header">
-                <div class="header-left">
-                    <button class="mobile-menu-btn" id="mobileMenuBtn">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <h1 class="page-title" id="pageTitle">Sohbet</h1>
-                </div>
-                
-                <div class="header-right">
-                    <div class="status-indicator">
-                        <div class="status-dot"></div>
-                        <span id="statusText">Çevrimiçi</span>
-                    </div>
-                </div>
-            </header>
-
-            <!-- Sohbet Konteyneri -->
-            <div class="chat-container" id="chatContainer">
-                <!-- Hoş Geldiniz Ekranı -->
-                <div class="welcome-screen" id="welcomeScreen">
-                    <div class="welcome-icon">
-                        <i class="fas fa-robot"></i>
-                    </div>
-                    <h2 class="welcome-title">Gelişmiş AI Ajansına Hoş Geldiniz</h2>
-                    <p class="welcome-subtitle">
-                        Kod çalıştırma, web arama, dosya yönetimi ve daha fazlası için güçlü yapay zeka desteği
-                    </p>
-                    
-                    <div class="feature-grid">
-                        <div class="feature-card">
-                            <div class="feature-icon">
-                                <i class="fas fa-code"></i>
-                            </div>
-                            <h3 class="feature-title">Kod Çalıştırma</h3>
-                            <p class="feature-description">JavaScript ve Python kodlarını güvenli bir şekilde çalıştırın</p>
-                        </div>
-                        
-                        <div class="feature-card">
-                            <div class="feature-icon">
-                                <i class="fas fa-search"></i>
-                            </div>
-                            <h3 class="feature-title">Web Araması</h3>
-                            <p class="feature-description">Güncel bilgilere anında erişim sağlayın</p>
-                        </div>
-                        
-                        <div class="feature-card">
-                            <div class="feature-icon">
-                                <i class="fas fa-file"></i>
-                            </div>
-                            <h3 class="feature-title">Dosya Yönetimi</h3>
-                            <p class="feature-description">Dosyaları yükleme, işleme ve analiz etme yeteneği</p>
-                        </div>
-                        
-                        <div class="feature-card">
-                            <div class="feature-icon">
-                                <i class="fas fa-brain"></i>
-                            </div>
-                            <h3 class="feature-title">Akıllı Bellek</h3>
-                            <p class="feature-description">Bilgileri hatırlama ve bağlamı koruma</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Mesajlar Alanı -->
-                <div class="messages-area" id="messagesArea" style="display: none;">
-                    <!-- Mesajlar buraya eklenecek -->
-                </div>
-
-                <!-- Yazma Göstergesi -->
-                <div class="typing-indicator" id="typingIndicator">
-                    <div class="typing-avatar">
-                        <i class="fas fa-robot"></i>
-                    </div>
-                    <div class="typing-content">
-                        <span style="margin-right: 0.5rem;">Yapay zeka düşünüyor</span>
-                        <div class="typing-dots">
-                            <div class="typing-dot"></div>
-                            <div class="typing-dot"></div>
-                            <div class="typing-dot"></div>
-                        </div>
-                    </div>
-                </div>
+            <div class="typing-indicator" id="typingIndicator">
+                AI yazıyor...
             </div>
-
-            <!-- Giriş Alanı -->
-            <div class="input-area">
-                <!-- Dosya Önizlemesi -->
-                <div class="file-preview" id="filePreview">
-                    <div class="file-info">
-                        <div class="file-details">
-                            <i class="fas fa-file"></i>
-                            <span id="fileName">dosya.txt</span>
-                            <span id="fileSize">(1.2 KB)</span>
-                        </div>
-                        <button class="file-remove" id="fileRemove">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="input-container">
-                    <div class="input-wrapper">
-                        <textarea 
-                            id="messageInput" 
-                            class="message-input" 
-                            placeholder="Mesajınızı yazın... (Shift+Enter ile yeni satır)"
-                            rows="1"
-                        ></textarea>
-                        
-                        <div class="input-actions">
-                            <input type="file" id="fileUpload" class="file-upload" accept=".txt,.pdf,.docx,.csv,.json,.jpg,.png,.gif">
-                            <button class="action-btn" id="fileBtn" title="Dosya Ekle">
-                                <i class="fas fa-paperclip"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <button class="send-btn" id="sendBtn" title="Gönder">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
+        </div>
+        
+        <div class="input-container">
+            <div class="file-upload">
+                <input type="file" id="fileInput" class="file-input" accept="image/*,.pdf,.docx">
+                <label for="fileInput" class="file-button">📎 Dosya Yükle</label>
             </div>
-        </main>
+            
+            <div class="input-row">
+                <select id="providerSelect" class="provider-select">
+                    <option value="openai">OpenAI GPT</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="anthropic">Claude</option>
+                </select>
+                
+                <input type="text" id="messageInput" class="message-input" 
+                       placeholder="Mesajınızı yazın..." maxlength="1000">
+                
+                <button id="sendButton" class="send-button">Gönder</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        class AIAgentApp {
+        class AIChat {
             constructor() {
-                this.sessionId = this.generateSessionId();
-                this.isProcessing = false;
-                this.currentPage = 'chat';
+                this.ws = null;
+                this.isConnected = false;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
                 
                 this.initializeElements();
                 this.setupEventListeners();
-                this.setupMarkdown();
-                
-                console.log('AI Agent Uygulaması oturumla başlatıldı:', this.sessionId);
-            }
-
-            generateSessionId() {
-                return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                this.connect();
             }
 
             initializeElements() {
-                // DOM öğeleri
-                this.elements = {
-                    sidebar: document.getElementById('sidebar'),
-                    sidebarOverlay: document.getElementById('sidebarOverlay'),
-                    mobileMenuBtn: document.getElementById('mobileMenuBtn'),
-                    pageTitle: document.getElementById('pageTitle'),
-                    statusText: document.getElementById('statusText'),
-                    chatContainer: document.getElementById('chatContainer'),
-                    welcomeScreen: document.getElementById('welcomeScreen'),
-                    messagesArea: document.getElementById('messagesArea'),
-                    typingIndicator: document.getElementById('typingIndicator'),
-                    messageInput: document.getElementById('messageInput'),
-                    sendBtn: document.getElementById('sendBtn'),
-                    fileBtn: document.getElementById('fileBtn'),
-                    fileUpload: document.getElementById('fileUpload'),
-                    filePreview: document.getElementById('filePreview'),
-                    fileName: document.getElementById('fileName'),
-                    fileSize: document.getElementById('fileSize'),
-                    fileRemove: document.getElementById('fileRemove')
-                };
+                this.messagesContainer = document.getElementById('messages');
+                this.messageInput = document.getElementById('messageInput');
+                this.sendButton = document.getElementById('sendButton');
+                this.providerSelect = document.getElementById('providerSelect');
+                this.fileInput = document.getElementById('fileInput');
+                this.typingIndicator = document.getElementById('typingIndicator');
+                this.connectionStatus = document.getElementById('connectionStatus');
+                this.statusText = document.getElementById('statusText');
             }
 
             setupEventListeners() {
-                // Mobil menü
-                this.elements.mobileMenuBtn.addEventListener('click', () => this.toggleSidebar());
-                this.elements.sidebarOverlay.addEventListener('click', () => this.closeSidebar());
-
-                // Navigasyon
-                document.querySelectorAll('.nav-item').forEach(item => {
-                    item.addEventListener('click', (e) => {
+                this.sendButton.addEventListener('click', () => this.sendMessage());
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        const page = item.dataset.page;
-                        this.navigateToPage(page);
-                    });
-                });
-
-                // Mesaj girişi
-                this.elements.messageInput.addEventListener('input', () => this.autoResizeTextarea());
-                this.elements.messageInput.addEventListener('keydown', (e) => this.handleKeyDown(e));
-
-                // Gönder butonu
-                this.elements.sendBtn.addEventListener('click', () => this.sendMessage());
-
-                // Dosya yükleme
-                this.elements.fileBtn.addEventListener('click', () => this.elements.fileUpload.click());
-                this.elements.fileUpload.addEventListener('change', (e) => this.handleFileUpload(e));
-                this.elements.fileRemove.addEventListener('click', () => this.removeFile());
-
-                // Bağlantı durumu
-                window.addEventListener('online', () => this.updateStatus('Çevrimiçi', 'success'));
-                window.addEventListener('offline', () => this.updateStatus('Çevrimdışı', 'error'));
-
-                // Enter'da form gönderimini engelle
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-                        e.preventDefault();
+                        this.sendMessage();
                     }
                 });
+                
+                this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
             }
 
-            setupMarkdown() {
-                if (typeof marked !== 'undefined') {
-                    marked.setOptions({
-                        breaks: true,
-                        gfm: true,
-                        highlight: function(code, lang) {
-                            return code; // Syntax highlighting buraya eklenebilir
+            connect() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws`;
+                
+                try {
+                    this.ws = new WebSocket(wsUrl);
+                    
+                    this.ws.onopen = () => {
+                        this.isConnected = true;
+                        this.reconnectAttempts = 0;
+                        this.updateConnectionStatus(true);
+                        console.log('WebSocket bağlantısı kuruldu');
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        this.handleMessage(JSON.parse(event.data));
+                    };
+                    
+                    this.ws.onclose = () => {
+                        this.isConnected = false;
+                        this.updateConnectionStatus(false);
+                        this.attemptReconnect();
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket hatası:', error);
+                        this.updateConnectionStatus(false);
+                    };
+                    
+                } catch (error) {
+                    console.error('WebSocket bağlantı hatası:', error);
+                    this.updateConnectionStatus(false);
+                    this.fallbackToHTTP();
+                }
+            }
+
+            attemptReconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    this.statusText.textContent = `Yeniden bağlanıyor... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`;
+                    
+                    setTimeout(() => {
+                        this.connect();
+                    }, 2000 * this.reconnectAttempts);
+                } else {
+                    this.statusText.textContent = 'Bağlantı başarısız - HTTP moduna geçiliyor';
+                    this.fallbackToHTTP();
+                }
+            }
+
+            fallbackToHTTP() {
+                this.isConnected = false;
+                this.statusText.textContent = 'HTTP modu aktif';
+            }
+
+            updateConnectionStatus(connected) {
+                this.connectionStatus.className = `connection-status ${connected ? 'connected' : ''}`;
+                this.statusText.textContent = connected ? 'Bağlı - WebSocket' : 'Bağlantı kesildi';
+                this.sendButton.disabled = false; // HTTP fallback olduğu için her zaman aktif
+            }
+
+            handleMessage(data) {
+                switch (data.type) {
+                    case 'welcome':
+                        this.statusText.textContent = 'Bağlı - WebSocket';
+                        break;
+                    case 'chat_response':
+                        this.addMessage('assistant', data.content, `${data.provider} - ${data.model}`);
+                        this.hideTyping();
+                        break;
+                    case 'typing':
+                        if (data.isTyping) {
+                            this.showTyping();
+                        } else {
+                            this.hideTyping();
                         }
-                    });
-                }
-            }
-
-            toggleSidebar() {
-                this.elements.sidebar.classList.toggle('open');
-                this.elements.sidebarOverlay.classList.toggle('show');
-            }
-
-            closeSidebar() {
-                this.elements.sidebar.classList.remove('open');
-                this.elements.sidebarOverlay.classList.remove('show');
-            }
-
-            navigateToPage(page) {
-                // Aktif navigasyon öğesini güncelle
-                document.querySelectorAll('.nav-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                document.querySelector(`[data-page="${page}"]`).classList.add('active');
-
-                // Sayfa başlığını güncelle
-                const titles = {
-                    chat: 'Sohbet',
-                    history: 'Geçmiş',
-                    files: 'Dosyalar',
-                    code: 'Kod Editörü',
-                    memory: 'Bellek',
-                    tasks: 'Görevler',
-                    stats: 'İstatistikler',
-                    settings: 'Ayarlar'
-                };
-                this.elements.pageTitle.textContent = titles[page] || 'Sayfa Adı';
-
-                // Sohbet arayüzünü göster/gizle
-                if (page === 'chat') {
-                    this.showChatInterface();
-                } else {
-                    this.showPlaceholderPage(page);
-                }
-
-                this.currentPage = page;
-                this.closeSidebar();
-            }
-
-            showChatInterface() {
-                this.elements.chatContainer.style.display = 'flex';
-                // Mesaj yoksa karşılama ekranını göster
-                if (this.elements.messagesArea.children.length === 0) {
-                    this.elements.welcomeScreen.style.display = 'flex';
-                    this.elements.messagesArea.style.display = 'none';
-                } else {
-                    this.elements.welcomeScreen.style.display = 'none';
-                    this.elements.messagesArea.style.display = 'block';
-                }
-            }
-
-            showPlaceholderPage(page) {
-                const titles = {
-                    history: 'Konuşma Geçmişi',
-                    files: 'Dosya Yöneticisi',
-                    code: 'Kod Editörü',
-                    memory: 'Bellek Yöneticisi',
-                    tasks: 'Görev Zamanlayıcı',
-                    stats: 'Sistem İstatistikleri',
-                    settings: 'Uygulama Ayarları'
-                };
-
-                const descriptions = {
-                    history: 'Geçmiş konuşmalarınızı görüntüleyin ve yönetin',
-                    files: 'Yüklenen dosyaları görüntüleyin ve yönetin',
-                    code: 'Kod yazın ve çalıştırın',
-                    memory: 'AI ajanının bellek kayıtlarını yönetin',
-                    tasks: 'Zamanlanmış görevleri görüntüleyin ve yönetin',
-                    stats: 'Sistem performansı ve kullanım istatistikleri',
-                    settings: 'Uygulama tercihlerinizi yapılandırın'
-                };
-
-                this.elements.chatContainer.innerHTML = `
-                    <div class="welcome-screen">
-                        <div class="welcome-icon">
-                            <i class="fas fa-${this.getPageIcon(page)}"></i>
-                        </div>
-                        <h2 class="welcome-title">${titles[page]}</h2>
-                        <p class="welcome-subtitle">${descriptions[page]}</p>
-                        <div class="alert alert-warning">
-                            <i class="fas fa-info-circle"></i>
-                            Bu özellik yakında kullanıma sunulacak
-                        </div>
-                    </div>
-                `;
-            }
-
-            getPageIcon(page) {
-                const icons = {
-                    history: 'history',
-                    files: 'folder',
-                    code: 'code',
-                    memory: 'brain',
-                    tasks: 'tasks',
-                    stats: 'chart-bar',
-                    settings: 'cog'
-                };
-                return icons[page] || 'robot';
-            }
-
-            autoResizeTextarea() {
-                const textarea = this.elements.messageInput;
-                textarea.style.height = 'auto';
-                textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-            }
-
-            handleKeyDown(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendMessage();
+                        break;
+                    case 'error':
+                        this.addMessage('assistant', `Hata: ${data.message}`, 'System');
+                        this.hideTyping();
+                        break;
                 }
             }
 
             async sendMessage() {
-                const message = this.elements.messageInput.value.trim();
-                if (!message || this.isProcessing) return;
+                const message = this.messageInput.value.trim();
+                if (!message) return;
 
-                if (message.length > 10000) {
-                    this.showAlert('Mesaj çok uzun (maksimum 10.000 karakter)', 'error');
-                    return;
+                const provider = this.providerSelect.value;
+                
+                this.addMessage('user', message);
+                this.messageInput.value = '';
+                this.sendButton.disabled = true;
+
+                if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
+                    // WebSocket kullan
+                    this.ws.send(JSON.stringify({
+                        type: 'chat',
+                        content: message,
+                        provider: provider
+                    }));
+                } else {
+                    // HTTP fallback
+                    await this.sendHTTPMessage(message, provider);
                 }
+            }
 
-                this.isProcessing = true;
-                this.elements.sendBtn.disabled = true;
-                this.updateStatus('İşleniyor...', 'processing');
-
-                // Hoş geldiniz ekranını gizle ve mesaj alanını göster
-                this.elements.welcomeScreen.style.display = 'none';
-                this.elements.messagesArea.style.display = 'block';
-
-                // Kullanıcı mesajı ekle
-                this.addMessage(message, 'user');
-                this.elements.messageInput.value = '';
-                this.autoResizeTextarea();
-
-                // Yazma göstergesini göster
-                this.showTypingIndicator();
-
+            async sendHTTPMessage(message, provider) {
+                this.showTyping();
+                
                 try {
                     const response = await fetch('/api/chat', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
                             message: message,
-                            sessionId: this.sessionId
+                            provider: provider
                         })
                     });
 
-                    const result = await response.json();
-                    this.hideTypingIndicator();
-
+                    const data = await response.json();
+                    
                     if (response.ok) {
-                        let responseMessage = result.response;
-                        
-                        // Fonksiyon sonuçlarını ekle
-                        if (result.functionResults && result.functionResults.length > 0) {
-                            responseMessage += this.formatFunctionResults(result.functionResults);
-                        }
-                        
-                        this.addMessage(responseMessage, 'agent');
-                        this.updateStatus(`Yanıt alındı`, 'success');
+                        this.addMessage('assistant', data.response, `${data.provider} - ${data.model}`);
                     } else {
-                        this.addMessage(`❌ Hata: ${result.error}`, 'agent');
-                        this.updateStatus('Hata oluştu', 'error');
+                        this.addMessage('assistant', `Hata: ${data.error}`, 'System');
                     }
-
                 } catch (error) {
-                    this.hideTypingIndicator();
-                    
-                    let errorMessage = 'Bağlantı hatası oluştu';
-                    if (!navigator.onLine) {
-                        errorMessage = 'İnternet bağlantısı yok';
-                    } else if (error.name === 'AbortError') {
-                        errorMessage = 'İstek zaman aşımına uğradı';
-                    }
-                    
-                    this.addMessage(`❌ ${errorMessage}`, 'agent');
-                    this.updateStatus('Bağlantı hatası', 'error');
+                    this.addMessage('assistant', `Bağlantı hatası: ${error.message}`, 'System');
                 } finally {
-                    this.isProcessing = false;
-                    this.elements.sendBtn.disabled = false;
-                    this.elements.messageInput.focus();
+                    this.hideTyping();
+                    this.sendButton.disabled = false;
                 }
             }
 
-            addMessage(content, sender) {
+            addMessage(type, content, info = '') {
                 const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${sender}`;
-                
-                const avatar = document.createElement('div');
-                avatar.className = 'message-avatar';
-                avatar.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+                messageDiv.className = `message ${type}`;
                 
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'message-content';
+                contentDiv.textContent = content;
                 
-                // Ajan mesajları için markdown'ı render et
-                if (typeof marked !== 'undefined' && sender === 'agent') {
-                    try {
-                        contentDiv.innerHTML = marked.parse(content);
-                    } catch (e) {
-                        contentDiv.textContent = content;
-                    }
-                } else {
-                    contentDiv.textContent = content;
+                if (info) {
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'message-info';
+                    infoDiv.textContent = info;
+                    contentDiv.appendChild(infoDiv);
                 }
                 
-                const timeDiv = document.createElement('span');
-                timeDiv.className = 'message-time';
-                timeDiv.textContent = new Date().toLocaleTimeString('tr-TR', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-                
-                contentDiv.appendChild(timeDiv);
-                messageDiv.appendChild(avatar);
                 messageDiv.appendChild(contentDiv);
+                this.messagesContainer.appendChild(messageDiv);
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
                 
-                this.elements.messagesArea.appendChild(messageDiv);
-                this.scrollToBottom();
+                this.sendButton.disabled = false;
             }
 
-            formatFunctionResults(results) {
-                let formatted = '\\n\\n';
-                results.forEach(result => {
-                    formatted += `<div class="function-result">
-                        <div class="function-title">
-                            <i class="fas fa-cog"></i>
-                            ${result.function}
-                        </div>
-                        <div class="function-content">${result.result}</div>
-                    </div>`;
-                });
-                return formatted;
+            showTyping() {
+                this.typingIndicator.style.display = 'block';
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
             }
 
-            showTypingIndicator() {
-                this.elements.typingIndicator.style.display = 'flex';
-                this.scrollToBottom();
+            hideTyping() {
+                this.typingIndicator.style.display = 'none';
             }
 
-            hideTypingIndicator() {
-                this.elements.typingIndicator.style.display = 'none';
-            }
-
-            scrollToBottom() {
-                this.elements.messagesArea.scrollTop = this.elements.messagesArea.scrollHeight;
-            }
-
-            updateStatus(text, type = 'default') {
-                this.elements.statusText.textContent = text;
-                
-                // 3 saniye sonra durumu sıfırla
-                if (type !== 'default') {
-                    setTimeout(() => {
-                        this.elements.statusText.textContent = 'Çevrimiçi';
-                    }, 3000);
-                }
-            }
-
-            async handleFileUpload(e) {
-                const file = e.target.files[0];
+            async handleFileUpload(event) {
+                const file = event.target.files[0];
                 if (!file) return;
-
-                if (file.size > 10 * 1024 * 1024) {
-                    this.showAlert('Dosya çok büyük (maksimum 10MB)', 'error');
-                    e.target.value = '';
-                    return;
-                }
-
-                // Dosya önizlemesini göster
-                this.elements.fileName.textContent = file.name;
-                this.elements.fileSize.textContent = `(${this.formatFileSize(file.size)})`;
-                this.elements.filePreview.style.display = 'block';
 
                 const formData = new FormData();
                 formData.append('file', file);
 
                 try {
-                    this.updateStatus('Dosya yükleniyor...', 'processing');
+                    this.addMessage('user', `📎 Dosya yüklendi: ${file.name}`);
                     
                     const response = await fetch('/api/upload', {
                         method: 'POST',
                         body: formData
                     });
 
-                    const result = await response.json();
+                    const data = await response.json();
                     
-                    if (result.success) {
-                        const message = `📁 **Dosya yüklendi:** ${file.name}\\n\\n**İçerik önizlemesi:**\\n${result.content}`;
-                        this.addMessage(message, 'agent');
-                        this.updateStatus('Dosya başarıyla yüklendi', 'success');
+                    if (response.ok) {
+                        this.addMessage('assistant', `Dosya başarıyla işlendi: ${data.content}`, 'File Processor');
                     } else {
-                        this.showAlert(`Dosya yükleme başarısız: ${result.error}`, 'error');
+                        this.addMessage('assistant', `Dosya yükleme hatası: ${data.error}`, 'System');
                     }
                 } catch (error) {
-                    this.showAlert(`Dosya yükleme hatası: ${error.message}`, 'error');
-                } finally {
-                    this.removeFile();
+                    this.addMessage('assistant', `Dosya yükleme hatası: ${error.message}`, 'System');
                 }
-            }
-
-            removeFile() {
-                this.elements.filePreview.style.display = 'none';
-                this.elements.fileUpload.value = '';
-            }
-
-            formatFileSize(bytes) {
-                if (bytes === 0) return '0 B';
-                const k = 1024;
-                const sizes = ['B', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-            }
-
-            showAlert(message, type = 'info') {
-                const alertDiv = document.createElement('div');
-                alertDiv.className = `alert alert-${type}`;
                 
-                const icon = type === 'error' ? 'exclamation-triangle' : 
-                           type === 'success' ? 'check-circle' : 
-                           type === 'warning' ? 'exclamation-circle' : 'info-circle';
-                
-                alertDiv.innerHTML = `
-                    <i class="fas fa-${icon}"></i>
-                    <span>${message}</span>
-                `;
-                
-                // Mesaj alanının en üstüne ekle
-                this.elements.messagesArea.insertBefore(alertDiv, this.elements.messagesArea.firstChild);
-                
-                // 5 saniye sonra kaldır
-                setTimeout(() => {
-                    if (alertDiv.parentNode) {
-                        alertDiv.parentNode.removeChild(alertDiv);
-                    }
-                }, 5000);
+                // Input'u temizle
+                event.target.value = '';
             }
         }
 
-        // DOM yüklendiğinde uygulamayı başlat
+        // Sayfa yüklendiğinde chat'i başlat
         document.addEventListener('DOMContentLoaded', () => {
-            window.aiApp = new AIAgentApp();
-        });
-
-        // Sayfa görünürlüğü değişikliklerini yönet
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && window.aiApp) {
-                window.aiApp.updateStatus('Çevrimiçi', 'success');
-            }
-        });
-
-        // Boşaltmadan önce işlem kontrolü
-        window.addEventListener('beforeunload', (e) => {
-            if (window.aiApp && window.aiApp.isProcessing) {
-                e.preventDefault();
-                e.returnValue = 'İşlem devam ediyor, çıkmak istediğinizden emin misiniz?';
-            }
+            new AIChat();
         });
     </script>
 </body>
-</html>'''
+</html>
