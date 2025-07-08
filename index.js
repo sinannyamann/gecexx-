@@ -17,17 +17,15 @@ import { dirname, join } from 'path';
 import fs from 'fs/promises';
 import multer from 'multer';
 import mammoth from 'mammoth';
-import pdf2pic from 'pdf2pic';
 import sharp from 'sharp';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import crypto from 'crypto';
-import { promisify } from 'util';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Enhanced Logger Configuration
+// Logger Configuration
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
@@ -46,14 +44,7 @@ const logger = winston.createLogger({
   ]
 });
 
-// Railway specific logging
-if (process.env.RAILWAY_ENVIRONMENT) {
-  logger.add(new winston.transports.Console({
-    format: winston.format.json()
-  }));
-}
-
-// Enhanced Cache Configuration
+// Cache Configuration
 const cache = new NodeCache({ 
   stdTTL: 600,
   checkperiod: 120,
@@ -66,38 +57,98 @@ function validateEnvironment() {
   const warnings = [];
   
   if (!process.env.DATABASE_URL) {
-    warnings.push('DATABASE_URL not set - database features disabled');
+    warnings.push('DATABASE_URL not set - database features will be limited');
   }
   
   const aiKeys = ['OPENAI_API_KEY', 'DEEPSEEK_API_KEY', 'ANTHROPIC_API_KEY'];
   const availableProviders = aiKeys.filter(key => process.env[key]);
   
   if (availableProviders.length === 0) {
-    warnings.push('No AI provider keys found');
+    warnings.push('No AI provider keys found - AI features will be limited');
   }
   
   warnings.forEach(warning => logger.warn(warning));
   logger.info(`Available AI providers: ${availableProviders.length}`);
 }
 
-// Database Configuration with Connection Pooling
+// Safe Database Configuration
 let pool = null;
-if (process.env.DATABASE_URL) {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-    acquireTimeoutMillis: 60000,
-    createTimeoutMillis: 30000,
-    destroyTimeoutMillis: 5000,
-    reapIntervalMillis: 1000,
-    createRetryIntervalMillis: 200,
-  });
+let dbConnected = false;
+
+async function initializeDatabase() {
+  if (!process.env.DATABASE_URL) {
+    logger.info('💾 Database: Not configured');
+    return false;
+  }
+
+  try {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+      acquireTimeoutMillis: 60000,
+      createTimeoutMillis: 30000,
+      destroyTimeoutMillis: 5000,
+      reapIntervalMillis: 1000,
+      createRetryIntervalMillis: 200,
+    });
+
+    // Test connection
+    const client = await pool.connect();
+    await client.query('SELECT NOW()');
+    client.release();
+
+    // Create tables if they don't exist
+    await createTables();
+    
+    dbConnected = true;
+    logger.info('💾 Database: Connected successfully');
+    return true;
+  } catch (error) {
+    logger.error('Database initialization failed', { error: error.message });
+    pool = null;
+    dbConnected = false;
+    return false;
+  }
 }
 
-// Multi-LLM Configuration
+async function createTables() {
+  if (!pool) return;
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        sid VARCHAR NOT NULL COLLATE "default",
+        sess JSON NOT NULL,
+        expire TIMESTAMP(6) NOT NULL
+      ) WITH (OIDS=FALSE);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS IDX_session_expire ON user_sessions(expire);
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_logs (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(255),
+        message TEXT,
+        response TEXT,
+        provider VARCHAR(50),
+        model VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    logger.info('Database tables created/verified');
+  } catch (error) {
+    logger.error('Table creation failed', { error: error.message });
+  }
+}
+
+// AI Providers Configuration
 const aiProviders = {
   openai: process.env.OPENAI_API_KEY ? new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -112,12 +163,12 @@ const aiProviders = {
   }
 };
 
-// Memory Management Class
+// Memory Manager
 class MemoryManager {
   constructor() {
     this.conversations = new Map();
-    this.maxConversations = 1000;
-    this.maxMessagesPerConversation = 50;
+    this.maxConversations = 500;
+    this.maxMessagesPerConversation = 20;
   }
 
   addMessage(sessionId, message) {
@@ -157,8 +208,8 @@ class MemoryManager {
   }
 }
 
-// Advanced AI Agent Class
-class AdvancedAIAgent {
+// AI Agent Class
+class AIAgent {
   constructor() {
     this.memoryManager = new MemoryManager();
     this.requestCount = 0;
@@ -171,7 +222,6 @@ class AdvancedAIAgent {
     
     const cachedResponse = cache.get(cacheKey);
     if (cachedResponse && !options.skipCache) {
-      logger.info('Returning cached AI response', { provider, cacheKey });
       return cachedResponse;
     }
 
@@ -194,20 +244,10 @@ class AdvancedAIAgent {
       }
 
       cache.set(cacheKey, response, options.cacheTTL || 300);
-      
-      logger.info('AI request successful', { 
-        provider, 
-        messageCount: messages.length,
-        responseLength: response.content?.length || 0
-      });
-
       return response;
     } catch (error) {
       this.errorCount++;
-      logger.error('AI request failed', { 
-        provider, 
-        error: error.message
-      });
+      logger.error('AI request failed', { provider, error: error.message });
       throw error;
     }
   }
@@ -220,7 +260,7 @@ class AdvancedAIAgent {
     const response = await aiProviders.openai.chat.completions.create({
       model: options.model || 'gpt-4o-mini',
       messages: messages,
-      max_tokens: options.maxTokens || 2000,
+      max_tokens: options.maxTokens || 1000,
       temperature: options.temperature || 0.7,
       stream: false
     });
@@ -243,7 +283,7 @@ class AdvancedAIAgent {
       {
         model: options.model || 'deepseek-chat',
         messages: messages,
-        max_tokens: options.maxTokens || 2000,
+        max_tokens: options.maxTokens || 1000,
         temperature: options.temperature || 0.7,
         stream: false
       },
@@ -251,7 +291,8 @@ class AdvancedAIAgent {
         headers: {
           'Authorization': `Bearer ${aiProviders.deepseek.apiKey}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 30000
       }
     );
 
@@ -275,7 +316,7 @@ class AdvancedAIAgent {
       `${aiProviders.anthropic.baseURL}/messages`,
       {
         model: options.model || 'claude-3-sonnet-20240229',
-        max_tokens: options.maxTokens || 2000,
+        max_tokens: options.maxTokens || 1000,
         temperature: options.temperature || 0.7,
         system: systemMessage?.content || '',
         messages: userMessages
@@ -285,7 +326,8 @@ class AdvancedAIAgent {
           'x-api-key': aiProviders.anthropic.apiKey,
           'Content-Type': 'application/json',
           'anthropic-version': '2023-06-01'
-        }
+        },
+        timeout: 30000
       }
     );
 
@@ -308,254 +350,49 @@ class AdvancedAIAgent {
   }
 }
 
-// Tool Executor Class
-class ToolExecutor {
-  constructor() {
-    this.tools = new Map();
-    this.registerDefaultTools();
-  }
-
-  registerDefaultTools() {
-    this.tools.set('Web Search', this.webSearch.bind(this));
-    this.tools.set('calculator', this.calculator.bind(this));
-    this.tools.set('weather', this.getWeather.bind(this));
-    this.tools.set('database_query', this.databaseQuery.bind(this));
-  }
-
-  async webSearch(query, options = {}) {
-    try {
-      const searchResults = await this.performWebSearch(query, options);
-      return {
-        success: true,
-        results: searchResults,
-        query: query
-      };
-    } catch (error) {
-      logger.error('Web search failed', { query, error: error.message });
-      return {
-        success: false,
-        error: error.message,
-        query: query
-      };
-    }
-  }
-
-  async calculator(expression) {
-    try {
-      const result = this.evaluateMathExpression(expression);
-      return {
-        success: true,
-        result: result,
-        expression: expression
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        expression: expression
-      };
-    }
-  }
-
-  async getWeather(location) {
-    try {
-      const weatherData = await this.fetchWeatherData(location);
-      return {
-        success: true,
-        data: weatherData,
-        location: location
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        location: location
-      };
-    }
-  }
-
-  async databaseQuery(query, params = []) {
-    if (!pool) {
-      return {
-        success: false,
-        error: 'Database not configured'
-      };
-    }
-
-    try {
-      const result = await pool.query(query, params);
-      return {
-        success: true,
-        rows: result.rows,
-        rowCount: result.rowCount
-      };
-    } catch (error) {
-      logger.error('Database query failed', { query, error: error.message });
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  async performWebSearch(query, options) {
-    return [];
-  }
-
-  evaluateMathExpression(expression) {
-    // Basit matematik işlemleri için güvenli değerlendirme
-    const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, '');
-    return Function('"use strict"; return (' + sanitized + ')')();
-  }
-
-  async fetchWeatherData(location) {
-    return { location, temperature: '20°C', condition: 'Sunny' };
-  }
-}
-
-// Task Scheduler Class
-class TaskScheduler {
-  constructor() {
-    this.tasks = new Map();
-    this.setupDefaultTasks();
-  }
-
-  setupDefaultTasks() {
-    cron.schedule('0 * * * *', () => {
-      this.cleanupCache();
-    });
-
-    if (pool) {
-      cron.schedule('0 2 * * *', () => {
-        this.performDatabaseMaintenance();
-      });
-    }
-
-    cron.schedule('*/30 * * * *', () => {
-      this.performMemoryCleanup();
-    });
-
-    cron.schedule('*/5 * * * *', () => {
-      this.performHealthCheck();
-    });
-  }
-
-  cleanupCache() {
-    const stats = cache.getStats();
-    logger.info('Cache cleanup started', stats);
-    cache.flushAll();
-    logger.info('Cache cleanup completed');
-  }
-
-  async performDatabaseMaintenance() {
-    if (!pool) return;
-    
-    try {
-      await pool.query('VACUUM ANALYZE;');
-      logger.info('Database maintenance completed');
-    } catch (error) {
-      logger.error('Database maintenance failed', { error: error.message });
-    }
-  }
-
-  performMemoryCleanup() {
-    if (global.gc) {
-      global.gc();
-      logger.info('Memory cleanup performed');
-    }
-  }
-
-  async performHealthCheck() {
-    try {
-      if (pool) {
-        await pool.query('SELECT 1');
-      }
-      
-      const healthStatus = {
-        database: pool ? 'healthy' : 'not_configured',
-        cache: cache.getStats(),
-        memory: process.memoryUsage(),
-        uptime: process.uptime()
-      };
-      
-      logger.debug('Health check completed', healthStatus);
-    } catch (error) {
-      logger.error('Health check failed', { error: error.message });
-    }
-  }
-}
-
-// Test database connection
-async function testDatabaseConnection() {
-  if (!pool) {
-    logger.info('Database not configured, skipping connection test');
-    return false;
-  }
-
-  try {
-    const client = await pool.connect();
-    await client.query('SELECT NOW()');
-    client.release();
-    logger.info('Database connection successful');
-    return true;
-  } catch (error) {
-    logger.error('Database connection failed', { error: error.message });
-    return false;
-  }
-}
-
-// Initialize core components
-const aiAgent = new AdvancedAIAgent();
-const toolExecutor = new ToolExecutor();
-const taskScheduler = new TaskScheduler();
+// Initialize components
+const aiAgent = new AIAgent();
 
 // Express App Configuration
 const app = express();
 const server = createServer(app);
 
-// ✅ Trust proxy ayarını burada ekle (app tanımlandıktan sonra)
+// Trust proxy for Railway
 app.set('trust proxy', 1);
 
 // Session Configuration
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000
+  }
+};
+
+// Use database session store if available
 if (pool) {
   const PgSession = connectPgSimple(session);
-  app.use(session({
-    store: new PgSession({
-      pool: pool,
-      tableName: 'user_sessions'
-    }),
-    secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000
-    }
-  }));
-} else {
-  // Memory session fallback
-  app.use(session({
-    secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000
-    }
-  }));
+  sessionConfig.store = new PgSession({
+    pool: pool,
+    tableName: 'user_sessions'
+  });
 }
+
+app.use(session(sessionConfig));
 
 // Security Middleware
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "ws:", "wss:"]
+      connectSrc: ["'self'", "ws:", "wss:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"]
     }
   }
 }));
@@ -564,7 +401,7 @@ app.use(helmet({
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: 'Too many requests from this IP, please try again later.',
+  message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -573,7 +410,7 @@ app.use(limiter);
 
 // CORS Configuration
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || true,
   credentials: true
 }));
 
@@ -607,54 +444,44 @@ app.get('/', (req, res) => {
     status: 'ok', 
     service: 'ai-agent',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    database: dbConnected ? 'connected' : 'disconnected'
   });
 });
 
-// Enhanced Health Check Endpoint
+// Health Check
 app.get('/health', async (req, res) => {
   const healthCheck = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    service: 'ai-agent'
+    service: 'ai-agent',
+    database: dbConnected ? 'connected' : 'disconnected'
   };
 
   try {
-    if (pool) {
-      const dbCheck = await Promise.race([
+    if (pool && dbConnected) {
+      await Promise.race([
         pool.query('SELECT 1'),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('DB timeout')), 2000)
         )
       ]);
       healthCheck.database = 'connected';
-    } else {
-      healthCheck.database = 'not_configured';
     }
     
     healthCheck.stats = aiAgent.getStats();
     res.status(200).json(healthCheck);
     
   } catch (error) {
-    logger.error('Health check failed', { error: error.message });
-    
-    healthCheck.status = 'degraded';
-    healthCheck.database = 'disconnected';
-    healthCheck.error = error.message;
-    
+    healthCheck.database = 'error';
+    healthCheck.database_error = error.message;
     res.status(200).json(healthCheck);
   }
 });
 
-// Statistics Endpoint
-app.get('/api/stats', (req, res) => {
-  const stats = aiAgent.getStats();
-  res.json(stats);
-});
-
-// Chat API Endpoint
+// Chat API
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, provider = 'openai', options = {} } = req.body;
@@ -692,6 +519,18 @@ app.post('/api/chat', async (req, res) => {
       model: aiResponse.model
     });
 
+    // Log to database if available
+    if (pool && dbConnected) {
+      try {
+        await pool.query(
+          'INSERT INTO chat_logs (session_id, message, response, provider, model) VALUES ($1, $2, $3, $4, $5)',
+          [sessionId, message, aiResponse.content, aiResponse.provider, aiResponse.model]
+        );
+      } catch (dbError) {
+        logger.warn('Failed to log chat to database', { error: dbError.message });
+      }
+    }
+
     res.json({
       response: aiResponse.content,
       provider: aiResponse.provider,
@@ -708,7 +547,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// File Upload Endpoint
+// File Upload
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -725,12 +564,17 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
     let processedContent = '';
     
-    if (req.file.mimetype.startsWith('image/')) {
-      processedContent = await processImage(req.file.path);
-    } else if (req.file.mimetype === 'application/pdf') {
-      processedContent = await processPDF(req.file.path);
-    } else if (req.file.mimetype.includes('document')) {
-      processedContent = await processDocument(req.file.path);
+    try {
+      if (req.file.mimetype.startsWith('image/')) {
+        const metadata = await sharp(req.file.path).metadata();
+        processedContent = `Image: ${metadata.width}x${metadata.height}, ${metadata.format}`;
+      } else if (req.file.mimetype.includes('document')) {
+        const result = await mammoth.extractRawText({ path: req.file.path });
+        processedContent = result.value.substring(0, 1000);
+      }
+    } catch (processError) {
+      logger.warn('File processing failed', { error: processError.message });
+      processedContent = 'File uploaded but processing failed';
     }
 
     res.json({
@@ -741,27 +585,14 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
   } catch (error) {
     logger.error('File upload error', { error: error.message });
-    res.status(500).json({ error: 'File processing failed' });
+    res.status(500).json({ error: 'File upload failed' });
   }
 });
 
-// Tool Execution Endpoint
-app.post('/api/tools/:toolName', async (req, res) => {
-  try {
-    const { toolName } = req.params;
-    const { params } = req.body;
-
-    if (!toolExecutor.tools.has(toolName)) {
-      return res.status(404).json({ error: 'Tool not found' });
-    }
-
-    const result = await toolExecutor.tools.get(toolName)(params);
-    res.json(result);
-
-  } catch (error) {
-    logger.error('Tool execution error', { toolName: req.params.toolName, error: error.message });
-    res.status(500).json({ error: 'Tool execution failed' });
-  }
+// Stats endpoint
+app.get('/api/stats', (req, res) => {
+  const stats = aiAgent.getStats();
+  res.json(stats);
 });
 
 // WebSocket Configuration
@@ -770,9 +601,8 @@ const wss = new WebSocketServer({
   path: '/ws'
 });
 
-// WebSocket Connection Handler
 wss.on('connection', (ws, req) => {
-  const sessionId = req.session?.id || crypto.randomUUID();
+  const sessionId = crypto.randomUUID();
   
   logger.info('WebSocket connection established', { sessionId });
 
@@ -792,20 +622,8 @@ wss.on('connection', (ws, req) => {
     try {
       const message = JSON.parse(data.toString());
       
-      switch (message.type) {
-        case 'chat':
-          await handleWebSocketChat(ws, message, sessionId);
-          break;
-        case 'tool':
-          await handleWebSocketTool(ws, message, sessionId);
-          break;
-        case 'pong':
-          break;
-        default:
-          ws.send(JSON.stringify({
-            type: 'error',
-            message: 'Unknown message type'
-          }));
+      if (message.type === 'chat') {
+        await handleWebSocketChat(ws, message, sessionId);
       }
     } catch (error) {
       logger.error('WebSocket message error', { error: error.message });
@@ -826,7 +644,6 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// WebSocket Chat Handler
 async function handleWebSocketChat(ws, message, sessionId) {
   try {
     const { content, provider = 'openai', options = {} } = message;
@@ -841,7 +658,7 @@ async function handleWebSocketChat(ws, message, sessionId) {
     const messages = [
       {
         role: 'system',
-        content: 'You are a helpful AI assistant. Provide accurate, helpful, and engaging responses.'
+        content: 'You are a helpful AI assistant.'
       },
       ...conversation.slice(-10),
       {
@@ -886,114 +703,13 @@ async function handleWebSocketChat(ws, message, sessionId) {
   }
 }
 
-// WebSocket Tool Handler
-async function handleWebSocketTool(ws, message, sessionId) {
-  try {
-    const { toolName, params } = message;
+// Cleanup tasks
+cron.schedule('0 * * * *', () => {
+  cache.flushAll();
+  logger.info('Cache cleaned');
+});
 
-    if (!toolExecutor.tools.has(toolName)) {
-      ws.send(JSON.stringify({
-        type: 'tool_error',
-        message: 'Tool not found'
-      }));
-      return;
-    }
-
-    const result = await toolExecutor.tools.get(toolName)(params);
-    
-    ws.send(JSON.stringify({
-      type: 'tool_response',
-      toolName: toolName,
-      result: result
-    }));
-
-  } catch (error) {
-    logger.error('WebSocket tool error', { error: error.message });
-    ws.send(JSON.stringify({
-      type: 'tool_error',
-      message: 'Tool execution failed'
-    }));
-  }
-}
-
-// Database Initialization
-async function initializeDatabase() {
-  if (!pool) {
-    logger.info('Database not configured, skipping initialization');
-    return;
-  }
-
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_sessions (
-        sid VARCHAR NOT NULL COLLATE "default",
-        sess JSON NOT NULL,
-        expire TIMESTAMP(6) NOT NULL
-      ) WITH (OIDS=FALSE);
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS chat_logs (
-        id SERIAL PRIMARY KEY,
-        session_id VARCHAR(255),
-        message TEXT,
-        response TEXT,
-        provider VARCHAR(50),
-        model VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS file_uploads (
-        id SERIAL PRIMARY KEY,
-        filename VARCHAR(255),
-        original_name VARCHAR(255),
-        mimetype VARCHAR(100),
-        size INTEGER,
-        processed_content TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    logger.info('Database initialized successfully');
-  } catch (error) {
-    logger.error('Database initialization failed', { error: error.message });
-    throw error;
-  }
-}
-
-// File Processing Functions
-async function processImage(filePath) {
-  try {
-    const metadata = await sharp(filePath).metadata();
-    return `Image processed: ${metadata.width}x${metadata.height}, format: ${metadata.format}`;
-  } catch (error) {
-    logger.error('Image processing failed', { error: error.message });
-    return 'Image processing failed';
-  }
-}
-
-async function processPDF(filePath) {
-  try {
-    return 'PDF processed successfully';
-  } catch (error) {
-    logger.error('PDF processing failed', { error: error.message });
-    return 'PDF processing failed';
-  }
-}
-
-async function processDocument(filePath) {
-  try {
-    const result = await mammoth.extractRawText({ path: filePath });
-    return result.value;
-  } catch (error) {
-    logger.error('Document processing failed', { error: error.message });
-    return 'Document processing failed';
-  }
-}
-
-// Error Handling Middleware
+// Error Handling
 app.use((error, req, res, next) => {
   logger.error('Unhandled error', { 
     error: error.message, 
@@ -1002,16 +718,13 @@ app.use((error, req, res, next) => {
   });
 
   res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+    error: 'Internal server error'
   });
 });
 
-// 404 Handler
 app.use((req, res) => {
   res.status(404).json({
-    error: 'Not found',
-    message: 'The requested resource was not found'
+    error: 'Not found'
   });
 });
 
@@ -1028,7 +741,7 @@ process.on('SIGTERM', async () => {
       await pool.end();
       logger.info('Database connections closed');
     } catch (error) {
-      logger.error('Error closing database connections', { error: error.message });
+      logger.error('Error closing database', { error: error.message });
     }
   }
 
@@ -1037,31 +750,15 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  
-  server.close(() => {
-    logger.info('HTTP server closed');
-  });
-
-  if (pool) {
-    try {
-      await pool.end();
-      logger.info('Database connections closed');
-    } catch (error) {
-      logger.error('Error closing database connections', { error: error.message });
-    }
-  }
-
   process.exit(0);
 });
 
-// Unhandled Promise Rejection
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', { promise, reason });
+  logger.error('Unhandled Rejection', { reason });
 });
 
-// Uncaught Exception
 process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', { error: error.message });
+  logger.error('Uncaught Exception', { error: error.message });
   process.exit(1);
 });
 
@@ -1071,36 +768,21 @@ const HOST = '0.0.0.0';
 
 async function startServer() {
   try {
-    // Validate environment
     validateEnvironment();
     
-    // Start server immediately
     server.listen(PORT, HOST, () => {
       logger.info(`🚀 Server running on ${HOST}:${PORT}`);
       logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`💾 Database: ${pool ? 'Configured' : 'Not configured'}`);
     });
     
     // Initialize database in background
     setTimeout(async () => {
-      try {
-        const dbConnected = await testDatabaseConnection();
-        if (dbConnected) {
-          await initializeDatabase();
-          logger.info('Database initialized');
-        }
-      } catch (error) {
-        logger.error('Database initialization failed', { error: error.message });
-      }
+      await initializeDatabase();
     }, 1000);
     
   } catch (error) {
     logger.error('Server startup error', { error: error.message });
-    
-    // Try to start server anyway for health checks
-    server.listen(PORT, HOST, () => {
-      logger.info(`🚀 Server running in degraded mode on ${HOST}:${PORT}`);
-    });
+    process.exit(1);
   }
 }
 
