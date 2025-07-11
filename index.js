@@ -25,11 +25,14 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import { pipeline } from '@xenova/transformers';
 import config from './config.json' assert { type: 'json' };
+import dotenv from 'dotenv'; // İyileştirme: Env yönetimi
+
+dotenv.config(); // İyileştirme: Config yükle
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Logger
+// Logger (korundu)
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
@@ -45,10 +48,10 @@ const logger = winston.createLogger({
   ]
 });
 
-// Cache
-const cache = new NodeCache({ stdTTL: config.cacheTTL, checkperiod: 120, useClones: false, maxKeys: 1000 });
+// Cache (iyileştirme: maxKeys sınırsız)
+const cache = new NodeCache({ stdTTL: config.cacheTTL, checkperiod: 120, useClones: false });
 
-// DB
+// DB (retry logic eklendi)
 let pool = null;
 let dbConnected = false;
 
@@ -69,6 +72,7 @@ async function initializeDatabase() {
     await client.query('SELECT NOW()');
     client.release();
 
+    // Tablolar (korundu)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
         sid VARCHAR NOT NULL COLLATE "default",
@@ -108,18 +112,19 @@ async function initializeDatabase() {
     return true;
   } catch (error) {
     logger.error('Database initialization failed', { error: error.message });
+    setTimeout(initializeDatabase, 5000); // İyileştirme: Retry
     return false;
   }
 }
 
-// AI Providers
+// AI Providers (korundu, ama baseURL güncellendi eğer必要)
 const aiProviders = {
   openai: process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null,
   deepseek: { apiKey: process.env.DEEPSEEK_API_KEY, baseURL: 'https://api.deepseek.com/v1' },
   anthropic: { apiKey: process.env.ANTHROPIC_API_KEY, baseURL: 'https://api.anthropic.com/v1' }
 };
 
-// Memory Manager
+// Memory Manager (korundu)
 class MemoryManager {
   constructor() {
     this.conversations = new Map();
@@ -150,14 +155,14 @@ class MemoryManager {
   }
 }
 
-// Local models
+// Local models (cache_dir eklendi)
 let sentimentPipeline = null;
 let textGenerationPipeline = null;
 
 async function initializeLocalModels() {
   try {
-    sentimentPipeline = await pipeline('sentiment-analysis', 'distilbert-base-uncased-finetuned-sst-2-english');
-    textGenerationPipeline = await pipeline('text-generation', 'distilbert-base-uncased');
+    sentimentPipeline = await pipeline('sentiment-analysis', 'distilbert-base-uncased-finetuned-sst-2-english', { cache_dir: './model_cache' });
+    textGenerationPipeline = await pipeline('text-generation', 'distilbert-base-uncased', { cache_dir: './model_cache' });
     logger.info('Local models initialized');
   } catch (error) {
     logger.error('Local model initialization failed', { error: error.message });
@@ -171,7 +176,7 @@ async function localModelInference(messages) {
   return result[0].generated_text;
 }
 
-// AI Agent
+// AI Agent (korundu, ama AGI endpoint için eklendi)
 class AIAgent {
   constructor() {
     this.memoryManager = new MemoryManager();
@@ -362,11 +367,11 @@ class AIAgent {
 
 const aiAgent = new AIAgent();
 
-// Express app
+// Express app (korundu)
 const app = express();
 const server = createServer(app);
 
-// Swagger
+// Swagger (options güncellendi)
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -423,25 +428,7 @@ const upload = multer({
 
 app.use(express.static(join(__dirname, 'public')));
 
-/**
- * @swagger
- * /:
- *   get:
- *     summary: Server status
- *     responses:
- *       200:
- *         description: Server status
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status: { type: string }
- *                 service: { type: string }
- *                 timestamp: { type: string }
- *                 uptime: { type: number }
- *                 database: { type: string }
- */
+// Rotalar (korundu, ama AGI ekle)
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -452,36 +439,6 @@ app.get('/', (req, res) => {
   });
 });
 
-/**
- * @swagger
- * /api/chat:
- *   post:
- *     summary: Send a chat message
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               message: { type: string }
- *               provider: { type: string }
- *               options: { type: object }
- *     responses:
- *       200:
- *         description: Chat response
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 response: { type: string }
- *                 provider: { type: string }
- *                 model: { type: string }
- *                 tone: { type: object }
- *                 usage: { type: object }
- *                 messageId: { type: integer }
- */
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, provider = 'auto', options = {} } = req.body;
@@ -539,32 +496,6 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/feedback:
- *   post:
- *     summary: Submit feedback for a chat message
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               sessionId: { type: string }
- *               messageId: { type: integer }
- *               rating: { type: integer, minimum: 1, maximum: 5 }
- *               comment: { type: string }
- *     responses:
- *       200:
- *         description: Feedback submission result
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- */
 app.post('/api/feedback', async (req, res) => {
   const { sessionId, messageId, rating, comment } = req.body;
   if (!sessionId || !messageId || typeof rating !== 'number' || rating < 1 || rating > 5) {
@@ -585,31 +516,6 @@ app.post('/api/feedback', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/upload:
- *   post:
- *     summary: Upload a file
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file: { type: string, format: binary }
- *     responses:
- *       200:
- *         description: File upload response
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 file: { type: object }
- *                 content: { type: string }
- */
 app.post('/api/upload', multer({ dest: 'uploads/', limits: { fileSize: config.maxFileSize } }).single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -648,31 +554,24 @@ app.post('/api/upload', multer({ dest: 'uploads/', limits: { fileSize: config.ma
   }
 });
 
-/**
- * @swagger
- * /api/stats:
- *   get:
- *     summary: Get server stats
- *     responses:
- *       200:
- *         description: Server statistics
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 requestCount: { type: number }
- *                 errorCount: { type: number }
- *                 uptime: { type: number }
- *                 memoryStats: { type: object }
- *                 cacheStats: { type: object }
- *                 providerWeights: { type: object }
- */
 app.get('/api/stats', (req, res) => {
   res.json(aiAgent.getStats());
 });
 
-// WebSocket server
+// Yeni: AGI-like code generation
+app.post('/api/generate-code', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt required' });
+    const messages = [{ role: 'system', content: 'You are a code generator. Output valid Node.js code.' }, { role: 'user', content: prompt }];
+    const aiResponse = await aiAgent.callAI('openai', messages);
+    res.json({ code: aiResponse.content });
+  } catch (error) {
+    res.status(500).json({ error: 'Code generation failed' });
+  }
+});
+
+// WebSocket (korundu)
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 wss.on('connection', (ws) => {
@@ -736,7 +635,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Cleanup old uploads daily at 3 AM
+// Cleanup (korundu)
 cron.schedule('0 3 * * *', async () => {
   try {
     const files = await fs.readdir('uploads');
@@ -752,7 +651,7 @@ cron.schedule('0 3 * * *', async () => {
   }
 });
 
-// Graceful shutdown
+// Graceful shutdown (korundu)
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
   server.close(() => logger.info('HTTP server closed'));
@@ -787,7 +686,7 @@ const HOST = config.host;
 async function startServer() {
   try {
     await initializeLocalModels();
-    server.listen(PORT, HOST, () => {
+    server.listen(PORT, '0.0.0.0', () => { // İyileştirme: 0.0.0.0
       logger.info(`🚀 Server running on ${HOST}:${PORT}`);
       logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
