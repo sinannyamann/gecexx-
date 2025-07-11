@@ -1,17 +1,15 @@
 {
   "name": "advanced-ai-agent",
   "version": "1.0.0",
-  "description": "Gelişmiş AI Agent with multi-provider support, WebSocket, long-term memory, and sentiment analysis",
+  "description": "Advanced AI Agent with active learning and multi-provider support",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
-  "engines": {
-    "node": ">=18"
-  },
   "dependencies": {
+    "@xenova/transformers": "^1.0.0",
     "axios": "^1.4.0",
     "compression": "^1.7.4",
     "connect-pg-simple": "^8.0.0",
@@ -25,21 +23,18 @@
     "node-cache": "^5.1.2",
     "pg": "^8.11.1",
     "sharp": "^0.32.4",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^4.6.3",
     "winston": "^3.9.0",
     "ws": "^8.13.0",
-    "openai": "^4.8.0"
+    "openai": "^4.9.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-  "keywords": [
-    "AI",
-    "agent",
-    "OpenAI",
-    "WebSocket",
-    "Express",
-    "Node.js"
-  ],
-  "author": "SeninAdın",
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "Your Name",
   "license": "MIT"
 }
