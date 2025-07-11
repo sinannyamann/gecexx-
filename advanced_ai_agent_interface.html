@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const API_URL = 'http://localhost:4000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -16,7 +16,7 @@ function App() {
   const sendMessage = async () => {
     if (!input.trim()) return;
     setLoading(true);
-    const userMessage = { role: 'user', content: input };
+    const userMessage = { role: 'user', content: input, timestamp: new Date().toLocaleTimeString() };
     setMessages(prev => [...prev, userMessage]);
     const messageText = input;
     setInput('');
@@ -28,6 +28,7 @@ function App() {
         credentials: 'include',
         body: JSON.stringify({ message: messageText, provider: 'auto' })
       });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
@@ -36,10 +37,12 @@ function App() {
         content: data.response,
         messageId: data.messageId,
         provider: data.provider,
-        model: data.model
+        model: data.model,
+        timestamp: new Date().toLocaleTimeString()
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (e) {
+      console.error('Chat error:', e);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error: ' + e.message }]);
     } finally {
       setLoading(false);
@@ -49,15 +52,17 @@ function App() {
   const submitFeedback = async (messageId, rating) => {
     if (!messageId) return;
     try {
-      await fetch(`${API_URL}/api/feedback`, {
+      const res = await fetch(`${API_URL}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ sessionId: null, messageId, rating })
       });
+      if (!res.ok) throw new Error('Feedback failed');
       setFeedbacks(prev => ({ ...prev, [messageId]: rating }));
-    } catch {
-      alert('Feedback submission failed');
+    } catch (e) {
+      console.error('Feedback error:', e);
+      alert('Feedback submission failed: ' + e.message);
     }
   };
 
@@ -67,7 +72,7 @@ function App() {
       <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 10, height: 450, overflowY: 'auto', backgroundColor: '#f9f9f9' }}>
         {messages.map((msg, i) => (
           <div key={i} style={{ marginBottom: 16, padding: 8, backgroundColor: msg.role === 'user' ? '#d1e7dd' : '#fff', borderRadius: 6 }}>
-            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{msg.role === 'user' ? 'You' : 'AI'}:</div>
+            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{msg.role === 'user' ? 'You' : 'AI'} ({msg.timestamp}):</div>
             <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
             {msg.role === 'assistant' && msg.messageId && (
               <div style={{ marginTop: 6 }}>
@@ -96,6 +101,7 @@ function App() {
             )}
           </div>
         ))}
+        {loading && <div style={{ textAlign: 'center', color: '#888' }}>Loading response...</div>}
         <div ref={messagesEndRef} />
       </div>
       <textarea
@@ -103,7 +109,7 @@ function App() {
         value={input}
         onChange={e => setInput(e.target.value)}
         disabled={loading}
-        style={{ width: '100%', padding: 10, fontSize: 16, marginTop: 12, borderRadius: 6, borderColor: '#ccc' }}
+        style={{ width: '100%', padding: 10, fontSize: 16, marginTop: 12, borderRadius: 6, borderColor: '#ccc', resize: 'none' }}
         placeholder="Type your message here..."
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
       />
