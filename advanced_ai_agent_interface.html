@@ -1,411 +1,130 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Advanced AI Agent</title>
-  <style>
-    /* Temel stil, responsive ve modern */
-    * {
-      margin: 0; padding: 0; box-sizing: border-box;
+import React, { useState, useEffect, useRef } from 'react';
+
+const API_URL = 'http://localhost:4000';
+
+function App() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [feedbacks, setFeedbacks] = useState({});
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    setLoading(true);
+    const userMessage = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
+    const messageText = input;
+    setInput('');
+
+    try {
+      const res = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message: messageText, provider: 'auto' })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      const assistantMessage = {
+        role: 'assistant',
+        content: data.response,
+        messageId: data.messageId,
+        provider: data.provider,
+        model: data.model
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (e) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: ' + e.message }]);
+    } finally {
+      setLoading(false);
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
+  };
+
+  const submitFeedback = async (messageId, rating) => {
+    if (!messageId) return;
+    try {
+      await fetch(`${API_URL}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ sessionId: null, messageId, rating })
+      });
+      setFeedbacks(prev => ({ ...prev, [messageId]: rating }));
+    } catch {
+      alert('Feedback submission failed');
     }
-    .container {
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-      width: 90%;
-      max-width: 800px;
-      height: 600px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      position: relative;
-    }
-    .header {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      color: white;
-      padding: 20px;
-      text-align: center;
-      position: relative;
-    }
-    .connection-status {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #dc3545;
-      transition: background 0.3s;
-    }
-    .connection-status.connected {
-      background: #28a745;
-    }
-    .header h1 {
-      font-size: 24px;
-      margin-bottom: 5px;
-    }
-    .status {
-      font-size: 14px;
-      opacity: 0.9;
-    }
-    .chat-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-      background: #f8f9fa;
-    }
-    .message {
-      margin-bottom: 15px;
-      display: flex;
-      align-items: flex-start;
-    }
-    .message.user {
-      justify-content: flex-end;
-    }
-    .message-content {
-      max-width: 70%;
-      padding: 12px 16px;
-      border-radius: 18px;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
-    .message.user .message-content {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      color: white;
-    }
-    .message.assistant .message-content {
-      background: white;
-      border: 1px solid #e9ecef;
-      color: #333;
-    }
-    .message-info {
-      font-size: 11px;
-      opacity: 0.7;
-      margin-top: 5px;
-    }
-    .input-container {
-      padding: 20px;
-      background: white;
-      border-top: 1px solid #e9ecef;
-    }
-    .input-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .provider-select {
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      background: white;
-      font-size: 14px;
-      min-width: 140px;
-    }
-    .message-input {
-      flex: 1;
-      padding: 12px 16px;
-      border: 1px solid #ddd;
-      border-radius: 25px;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.3s;
-    }
-    .message-input:focus {
-      border-color: #4facfe;
-    }
-    .send-button {
-      padding: 12px 20px;
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      color: white;
-      border: none;
-      border-radius: 25px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: transform 0.2s;
-    }
-    .send-button:hover {
-      transform: translateY(-1px);
-    }
-    .send-button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-    .typing-indicator {
-      display: none;
-      padding: 10px 16px;
-      color: #666;
-      font-style: italic;
-      font-size: 14px;
-    }
-    .file-upload {
-      margin-bottom: 10px;
-    }
-    .file-input {
-      display: none;
-    }
-    .file-button {
-      padding: 8px 16px;
-      background: #f8f9fa;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background-color 0.3s;
-    }
-    .file-button:hover {
-      background: #e9ecef;
-    }
-    @media (max-width: 768px) {
-      .container {
-        width: 95%;
-        height: 90vh;
-        border-radius: 10px;
-      }
-      .input-row {
-        flex-direction: column;
-      }
-      .provider-select {
-        width: 100%;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div id="connectionStatus" class="connection-status"></div>
-      <h1>🤖 Advanced AI Agent</h1>
-      <div id="statusText" class="status">Bağlanıyor...</div>
-    </div>
-    <div class="chat-container">
-      <div id="messages" class="messages">
-        <div class="message assistant">
-          <div class="message-content">
-            Merhaba! Ben gelişmiş AI asistanınızım. Size nasıl yardımcı olabilirim?
-            <div class="message-info">AI Assistant</div>
+  };
+
+  return (
+    <div style={{ maxWidth: 700, margin: 'auto', padding: 20, fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif' }}>
+      <h1 style={{ textAlign: 'center' }}>AI Agent Chat</h1>
+      <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 10, height: 450, overflowY: 'auto', backgroundColor: '#f9f9f9' }}>
+        {messages.map((msg, i) => (
+          <div key={i} style={{ marginBottom: 16, padding: 8, backgroundColor: msg.role === 'user' ? '#d1e7dd' : '#fff', borderRadius: 6 }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{msg.role === 'user' ? 'You' : 'AI'}:</div>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+            {msg.role === 'assistant' && msg.messageId && (
+              <div style={{ marginTop: 6 }}>
+                <span>Rate this response: </span>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    disabled={feedbacks[msg.messageId] === star}
+                    onClick={() => submitFeedback(msg.messageId, star)}
+                    style={{
+                      color: star <= (feedbacks[msg.messageId] || 0) ? '#ffc107' : '#ccc',
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'none',
+                      fontSize: 20,
+                      padding: 0,
+                      marginRight: 4,
+                      userSelect: 'none'
+                    }}
+                    aria-label={`Rate ${star} star`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+        ))}
+        <div ref={messagesEndRef} />
       </div>
-      <div id="typingIndicator" class="typing-indicator">AI yazıyor...</div>
+      <textarea
+        rows={3}
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        disabled={loading}
+        style={{ width: '100%', padding: 10, fontSize: 16, marginTop: 12, borderRadius: 6, borderColor: '#ccc' }}
+        placeholder="Type your message here..."
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+      />
+      <button
+        onClick={sendMessage}
+        disabled={loading || !input.trim()}
+        style={{
+          marginTop: 10,
+          padding: '10px 20px',
+          fontSize: 16,
+          borderRadius: 6,
+          border: 'none',
+          backgroundColor: '#0d6efd',
+          color: 'white',
+          cursor: loading || !input.trim() ? 'not-allowed' : 'pointer'
+        }}
+      >
+        {loading ? 'Sending...' : 'Send'}
+      </button>
     </div>
-    <div class="input-container">
-      <div class="file-upload">
-        <input type="file" id="fileInput" class="file-input" accept="image/*,.pdf,.docx" />
-        <label for="fileInput" class="file-button">📎 Dosya Yükle</label>
-      </div>
-      <div class="input-row">
-        <select id="providerSelect" class="provider-select">
-          <option value="openai">OpenAI GPT</option>
-          <option value="deepseek">DeepSeek</option>
-          <option value="anthropic">Claude</option>
-          <option value="auto">En İyi (Oto)</option>
-        </select>
-        <input type="text" id="messageInput" class="message-input" placeholder="Mesajınızı yazın..." maxlength="1000" />
-        <button id="sendButton" class="send-button">Gönder</button>
-      </div>
-    </div>
-  </div>
+  );
+}
 
-  <script>
-    class AIChat {
-      constructor() {
-        this.ws = null;
-        this.isConnected = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
-
-        this.messagesContainer = document.getElementById('messages');
-        this.messageInput = document.getElementById('messageInput');
-        this.sendButton = document.getElementById('sendButton');
-        this.providerSelect = document.getElementById('providerSelect');
-        this.fileInput = document.getElementById('fileInput');
-        this.typingIndicator = document.getElementById('typingIndicator');
-        this.connectionStatus = document.getElementById('connectionStatus');
-        this.statusText = document.getElementById('statusText');
-
-        this.sendButton.addEventListener('click', () => this.sendMessage());
-        this.messageInput.addEventListener('keypress', e => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            this.sendMessage();
-          }
-        });
-        this.fileInput.addEventListener('change', e => this.handleFileUpload(e));
-
-        this.connect();
-      }
-
-      connect() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
-
-        try {
-          this.ws = new WebSocket(wsUrl);
-
-          this.ws.onopen = () => {
-            this.isConnected = true;
-            this.reconnectAttempts = 0;
-            this.updateConnectionStatus(true);
-            this.statusText.textContent = 'Bağlı - WebSocket';
-          };
-
-          this.ws.onmessage = event => this.handleMessage(JSON.parse(event.data));
-
-          this.ws.onclose = () => {
-            this.isConnected = false;
-            this.updateConnectionStatus(false);
-            this.attemptReconnect();
-          };
-
-          this.ws.onerror = error => {
-            console.error('WebSocket hatası:', error);
-            this.updateConnectionStatus(false);
-          };
-        } catch (error) {
-          console.error('WebSocket bağlantı hatası:', error);
-          this.updateConnectionStatus(false);
-          this.fallbackToHTTP();
-        }
-      }
-
-      attemptReconnect() {
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          this.statusText.textContent = `Yeniden bağlanıyor... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`;
-          setTimeout(() => this.connect(), 2000 * this.reconnectAttempts);
-        } else {
-          this.statusText.textContent = 'Bağlantı başarısız - HTTP moduna geçiliyor';
-          this.fallbackToHTTP();
-        }
-      }
-
-      fallbackToHTTP() {
-        this.isConnected = false;
-        this.statusText.textContent = 'HTTP modu aktif';
-      }
-
-      updateConnectionStatus(connected) {
-        this.connectionStatus.className = `connection-status ${connected ? 'connected' : ''}`;
-        this.sendButton.disabled = false;
-      }
-
-      handleMessage(data) {
-        switch (data.type) {
-          case 'welcome':
-            this.statusText.textContent = 'Bağlı - WebSocket';
-            break;
-          case 'chat_response':
-            this.addMessage('assistant', data.content, `${data.provider} - ${data.model}`);
-            this.hideTyping();
-            break;
-          case 'typing':
-            if (data.isTyping) this.showTyping();
-            else this.hideTyping();
-            break;
-          case 'error':
-            this.addMessage('assistant', `Hata: ${data.message}`, 'System');
-            this.hideTyping();
-            break;
-        }
-      }
-
-      async sendMessage() {
-        const message = this.messageInput.value.trim();
-        if (!message) return;
-
-        let provider = this.providerSelect.value;
-        if (provider === 'auto') provider = ['openai', 'deepseek', 'anthropic'];
-
-        this.addMessage('user', message);
-        this.messageInput.value = '';
-        this.sendButton.disabled = true;
-
-        if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.send(JSON.stringify({ type: 'chat', content: message, provider }));
-        } else {
-          await this.sendHTTPMessage(message, provider);
-        }
-      }
-
-      async sendHTTPMessage(message, provider) {
-        this.showTyping();
-        try {
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message, provider })
-          });
-          const data = await response.json();
-          if (response.ok) this.addMessage('assistant', data.response, `${data.provider} - ${data.model}`);
-          else this.addMessage('assistant', `Hata: ${data.error}`, 'System');
-        } catch (error) {
-          this.addMessage('assistant', `Bağlantı hatası: ${error.message}`, 'System');
-        } finally {
-          this.hideTyping();
-          this.sendButton.disabled = false;
-        }
-      }
-
-      addMessage(type, content, info = '') {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${type}`;
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.textContent = content;
-        if (info) {
-          const infoDiv = document.createElement('div');
-          infoDiv.className = 'message-info';
-          infoDiv.textContent = info;
-          contentDiv.appendChild(infoDiv);
-        }
-        messageDiv.appendChild(contentDiv);
-        this.messagesContainer.appendChild(messageDiv);
-        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-        this.sendButton.disabled = false;
-      }
-
-      showTyping() {
-        this.typingIndicator.style.display = 'block';
-        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-      }
-
-      hideTyping() {
-        this.typingIndicator.style.display = 'none';
-      }
-
-      async handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const formData = new FormData();
-        formData.append('file', file);
-        try {
-          this.addMessage('user', `📎 Dosya yüklendi: ${file.name}`);
-          const response = await fetch('/api/upload', { method: 'POST', body: formData });
-          const data = await response.json();
-          if (response.ok) this.addMessage('assistant', `Dosya başarıyla işlendi: ${data.content}`, 'File Processor');
-          else this.addMessage('assistant', `Dosya yükleme hatası: ${data.error}`, 'System');
-        } catch (error) {
-          this.addMessage('assistant', `Dosya yükleme hatası: ${error.message}`, 'System');
-        }
-        event.target.value = '';
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => new AIChat());
-  </script>
-</body>
-</html>
+export default App;
