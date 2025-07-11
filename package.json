@@ -1,15 +1,17 @@
 {
-“name”: “agi-agent”,
+“name”: “advanced-agi-agent”,
 “version”: “2.0.0”,
-“description”: “Advanced AGI Agent with multi-modal capabilities, learning, and skill execution”,
+“description”: “Advanced AGI Agent with multi-modal capabilities, learning, and beautiful web interface”,
 “main”: “index.js”,
 “type”: “module”,
 “scripts”: {
 “start”: “node index.js”,
 “dev”: “node –watch index.js”,
 “test”: “node –test”,
-“build”: “echo ‘No build step required’”,
-“railway-deploy”: “npm start”
+“build”: “echo ‘No build step required - static HTML interface’”,
+“railway-deploy”: “npm start”,
+“setup”: “mkdir -p public uploads model_cache && cp advanced_ai_agent_interface.html public/index.html”,
+“postinstall”: “npm run setup”
 },
 “keywords”: [
 “agi”,
@@ -20,9 +22,13 @@
 “nlp”,
 “openai”,
 “anthropic”,
-“deepseek”
+“deepseek”,
+“groq”,
+“railway”,
+“websocket”,
+“learning”
 ],
-“author”: “Your Name”,
+“author”: “AGI Developer”,
 “license”: “MIT”,
 “dependencies”: {
 “express”: “^4.18.2”,
@@ -56,10 +62,28 @@
 },
 “repository”: {
 “type”: “git”,
-“url”: “https://github.com/yourusername/agi-agent.git”
+“url”: “https://github.com/yourusername/advanced-agi-agent.git”
 },
 “bugs”: {
-“url”: “https://github.com/yourusername/agi-agent/issues”
+“url”: “https://github.com/yourusername/advanced-agi-agent/issues”
 },
-“homepage”: “https://github.com/yourusername/agi-agent#readme”
+“homepage”: “https://github.com/yourusername/advanced-agi-agent#readme”,
+“files”: [
+“index.js”,
+“advanced_ai_agent_interface.html”,
+“package.json”,
+“README.md”
+],
+“directories”: {
+“lib”: “.”,
+“doc”: “docs”
+},
+“railway”: {
+“build”: {
+“command”: “npm run setup”
+},
+“start”: {
+“command”: “npm start”
+}
+}
 }
