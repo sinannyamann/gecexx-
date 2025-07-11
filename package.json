@@ -1,39 +1,47 @@
 {
   "name": "advanced-ai-agent",
-  "version": "1.0.0",
-  "description": "Advanced AI Agent with active learning and multi-provider support",
+  "version": "1.1.0",
+  "description": "Advanced AI Agent with active learning and multi-provider support, optimized for Railway deployment",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "concurrently \"nodemon index.js\" \"cd frontend && npm run start\"",
+    "build": "cd frontend && npm run build && cp -r build ../public && echo 'Build complete'",
+    "lint": "eslint .",
+    "test": "jest"
   },
   "dependencies": {
-    "@xenova/transformers": "^1.0.0",
-    "axios": "^1.4.0",
+    "@xenova/transformers": "^2.17.2",
+    "axios": "^1.7.2",
     "compression": "^1.7.4",
-    "connect-pg-simple": "^8.0.0",
+    "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "express-rate-limit": "^6.7.0",
-    "express-session": "^1.17.3",
-    "helmet": "^7.0.0",
-    "mammoth": "^1.4.2",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.1",
+    "express-session": "^1.18.0",
+    "helmet": "^7.1.0",
+    "mammoth": "^1.8.0",
     "multer": "^1.4.5-lts.1",
     "node-cache": "^5.1.2",
-    "pg": "^8.11.1",
-    "sharp": "^0.32.4",
+    "node-cron": "^3.0.3",
+    "openai": "^4.52.7",
+    "pg": "^8.12.0",
+    "sharp": "^0.33.4",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^4.6.3",
-    "winston": "^3.9.0",
-    "ws": "^8.13.0",
-    "openai": "^4.9.0"
+    "swagger-ui-express": "^5.0.1",
+    "winston": "^3.13.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.4.5",
+    "eslint": "^9.6.1",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.4"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.0.0"
   },
   "author": "Your Name",
   "license": "MIT"
