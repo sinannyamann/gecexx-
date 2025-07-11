@@ -8,10 +8,8 @@
 “start”: “node index.js”,
 “dev”: “node –watch index.js”,
 “test”: “node –test”,
-“build”: “echo ‘No build step required - static HTML interface’”,
-“railway-deploy”: “npm start”,
-“setup”: “mkdir -p public uploads model_cache && cp advanced_ai_agent_interface.html public/index.html”,
-“postinstall”: “npm run setup”
+“build”: “echo ‘No build step required’”,
+“setup”: “mkdir -p public uploads model_cache”
 },
 “keywords”: [
 “agi”,
@@ -53,9 +51,6 @@
 “@xenova/transformers”: “^2.10.0”,
 “dotenv”: “^16.3.1”
 },
-“devDependencies”: {
-“nodemon”: “^3.0.2”
-},
 “engines”: {
 “node”: “>=18.0.0”,
 “npm”: “>=8.0.0”
@@ -63,27 +58,5 @@
 “repository”: {
 “type”: “git”,
 “url”: “https://github.com/yourusername/advanced-agi-agent.git”
-},
-“bugs”: {
-“url”: “https://github.com/yourusername/advanced-agi-agent/issues”
-},
-“homepage”: “https://github.com/yourusername/advanced-agi-agent#readme”,
-“files”: [
-“index.js”,
-“advanced_ai_agent_interface.html”,
-“package.json”,
-“README.md”
-],
-“directories”: {
-“lib”: “.”,
-“doc”: “docs”
-},
-“railway”: {
-“build”: {
-“command”: “npm run setup”
-},
-“start”: {
-“command”: “npm start”
-}
 }
 }
