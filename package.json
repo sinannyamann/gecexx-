@@ -1,17 +1,10 @@
 {
-  "name": "advanced-agi-agent",
-  "version": "2.0.0",
-  "description": "Advanced AGI Agent with multi-modal capabilities and learning",
-  "main": "index.js",
+  "name": "agi-agent",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "build": "echo 'Build complete'"
+    "start": "node index.js"
   },
-  "keywords": ["agi", "ai", "agent", "chatbot"],
-  "author": "Developer",
-  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "ws": "^8.14.2",
@@ -20,19 +13,13 @@
     "axios": "^1.6.7",
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5",
     "compression": "^1.7.4",
     "winston": "^3.11.0",
     "node-cache": "^5.1.2",
-    "node-cron": "^3.0.3",
-    "multer": "^1.4.5",
     "express-session": "^1.17.3",
-    "connect-pg-simple": "^9.0.1",
-    "swagger-ui-express": "^5.0.0",
-    "swagger-jsdoc": "^6.2.8",
     "dotenv": "^16.3.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18"
   }
 }
