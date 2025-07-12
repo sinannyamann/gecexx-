@@ -320,7 +320,7 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     placeholder="Debug mesajı yazın... (Enter = gönder)"
                     rows="1"
                 ></textarea>
-                <button id="sendButton" class="send-button">Send</button>
+                <button id="sendButton" class="send-button" type="button">Send</button>
             </div>
         </div>
     </div>
@@ -332,6 +332,7 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 this.messageCount = 0;
                 this.debugLogs = [];
                 this.API_URL = window.location.origin;
+                this.isProcessing = false;
                 
                 this.messagesContainer = document.getElementById('messages');
                 this.messageInput = document.getElementById('messageInput');
@@ -365,7 +366,9 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 // En fazla 50 log tutma
                 if (this.debugLogs.length > 50) {
                     this.debugLogs.shift();
-                    this.debugPanel.removeChild(this.debugPanel.firstChild);
+                    if (this.debugPanel.firstChild) {
+                        this.debugPanel.removeChild(this.debugPanel.firstChild);
+                    }
                 }
             }
             
@@ -374,7 +377,13 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 
                 try {
                     // Health endpoint test
-                    const healthResponse = await fetch(`${this.API_URL}/health`);
+                    const healthResponse = await fetch(`${this.API_URL}/health`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
                     this.log(`📡 Health endpoint: ${healthResponse.status}`, healthResponse.ok ? 'success' : 'error');
                     
                     if (healthResponse.ok) {
@@ -382,6 +391,8 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                         this.log(`✅ Server online: ${healthData.service || 'AGI Agent'}`, 'success');
                         document.getElementById('connectionStatus').textContent = 'Status: Online';
                         document.getElementById('statusIndicator').style.background = '#4ade80';
+                    } else {
+                        throw new Error(`Health check failed: ${healthResponse.status}`);
                     }
                     
                 } catch (error) {
@@ -423,26 +434,48 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
             }
             
             initEventListeners() {
-                this.sendButton.addEventListener('click', () => this.sendMessage());
+                // Send button click event
+                this.sendButton.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.log('🖱️ Send button clicked');
+                    this.sendMessage();
+                });
                 
+                // Enter key event
                 this.messageInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
+                        this.log('⌨️ Enter key pressed');
                         this.sendMessage();
                     }
                 });
                 
+                // Input change event
                 this.messageInput.addEventListener('input', () => {
                     this.updateSendButton();
+                });
+                
+                // Focus event
+                this.messageInput.addEventListener('focus', () => {
+                    this.log('🎯 Input focused');
                 });
             }
             
             async sendMessage() {
+                if (this.isProcessing) {
+                    this.log('⚠️ Zaten işlem devam ediyor, bekleyin...', 'error');
+                    return;
+                }
+
                 const message = this.messageInput.value.trim();
                 if (!message) {
                     this.log('⚠️ Boş mesaj gönderilmeye çalışıldı', 'error');
                     return;
                 }
+                
+                this.isProcessing = true;
+                this.sendButton.disabled = true;
+                this.sendButton.textContent = 'Sending...';
                 
                 this.log(`📤 Mesaj gönderiliyor: "${message}"`);
                 
@@ -484,7 +517,8 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     this.log(`📋 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
                     
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        const errorText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
                     }
                     
                     const data = await response.json();
@@ -515,6 +549,11 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                         error: true,
                         timestamp: new Date().toLocaleTimeString()
                     });
+                } finally {
+                    this.isProcessing = false;
+                    this.sendButton.disabled = false;
+                    this.sendButton.textContent = 'Send';
+                    this.updateSendButton();
                 }
             }
             
@@ -610,8 +649,8 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
             
             updateSendButton() {
                 const hasText = this.messageInput.value.trim().length > 0;
-                this.sendButton.disabled = !hasText;
-                this.sendButton.style.opacity = hasText ? '1' : '0.6';
+                this.sendButton.disabled = !hasText || this.isProcessing;
+                this.sendButton.style.opacity = (hasText && !this.isProcessing) ? '1' : '0.6';
             }
             
             updateDisplay() {
@@ -627,7 +666,20 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
         
         // Sayfa yüklendiğinde başlat
         document.addEventListener('DOMContentLoaded', () => {
-            window.debugChat = new DebugAGIChat();
+            try {
+                window.debugChat = new DebugAGIChat();
+                console.log('Debug chat initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize debug chat:', error);
+            }
+        });
+        
+        // Error handling
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.error);
+            if (window.debugChat) {
+                window.debugChat.log(`❌ Global error: ${e.error.message}`, 'error');
+            }
         });
     </script>
 </body>
