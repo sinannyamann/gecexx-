@@ -311,26 +311,18 @@ class ToolSystem extends EventEmitter {
 
   async performWebSearch(query, maxResults = 5) {
     // Implement with your preferred search API (SerpAPI, Google Custom Search, etc.)
-    // This is a placeholder implementation - added basic DuckDuckGo search for completeness
-    try {
-      const response = await axios.get(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`);
-      const results = response.data.RelatedTopics.slice(0, maxResults).map(topic => ({
-        title: topic.Text,
-        url: topic.FirstURL,
-        snippet: topic.Text
-      }));
-      return results;
-    } catch (error) {
-      logger.error('Web search failed:', error);
-      return [];
-    }
+    // This is a placeholder implementation
+    return [
+      { title: 'Search Result 1', url: 'https://example.com/1', snippet: 'Result content...' },
+      { title: 'Search Result 2', url: 'https://example.com/2', snippet: 'Result content...' }
+    ];
   }
 
   async executeCode(language, code) {
     // Implement safe code execution with Docker or similar sandboxing
-    // This is a placeholder implementation - for safety, not implementing real execution in Railway
+    // This is a placeholder implementation
     return {
-      output: 'Code execution is disabled in this environment for security reasons.',
+      output: 'Code execution placeholder',
       exitCode: 0,
       language: language
     };
@@ -340,9 +332,6 @@ class ToolSystem extends EventEmitter {
     // Implement safe file system operations
     const allowedPaths = ['/tmp', '/workspace'];
     // Add security checks here
-    if (!allowedPaths.some(path => params.path.startsWith(path))) {
-      return { error: 'Path not allowed', success: false };
-    }
     
     switch (params.action) {
       case 'read':
@@ -822,7 +811,7 @@ class AdvancedAGIAgent extends EventEmitter {
       logger.error('Message processing failed:', error);
       
       const fallbackResponse = {
-        content: `Error occurred: ${error.message}. Please check your API keys or configuration.`,
+        content: "I encountered an error processing your message. Let me try to help you in a different way.",
         provider: 'fallback',
         model: 'error-handler',
         confidence: 0.1,
@@ -1018,10 +1007,6 @@ Confidence: ${reasoning.confidence}`;
     // Select provider based on context and current performance
     const availableProviders = Object.keys(aiProviders).filter(p => aiProviders[p]);
     
-    if (availableProviders.length === 0) {
-      return 'mock'; // Fallback to mock if no providers
-    }
-
     if (context.reasoning && context.reasoning.method === 'deductive') {
       return availableProviders.includes('anthropic') ? 'anthropic' : availableProviders[0];
     }
@@ -1035,7 +1020,7 @@ Confidence: ${reasoning.confidence}`;
       this.providerWeights[b] - this.providerWeights[a]
     );
     
-    return weightedProviders[0] || 'mock';
+    return weightedProviders[0] || 'openai';
   }
 
   calculateOptimalTemperature(context) {
@@ -1115,7 +1100,7 @@ Confidence: ${reasoning.confidence}`;
     // Simple topic extraction - in production, use more sophisticated NLP
     const topicKeywords = {
       'technology': ['AI', 'computer', 'programming', 'software', 'tech'],
-      'science': ['research', 'study', 'experiment', ' theory', 'science'],
+      'science': ['research', 'study', 'experiment', 'theory', 'science'],
       'business': ['company', 'market', 'finance', 'strategy', 'business'],
       'health': ['health', 'medical', 'doctor', 'wellness', 'fitness'],
       'education': ['learn', 'study', 'school', 'education', 'knowledge']
@@ -1135,17 +1120,10 @@ Confidence: ${reasoning.confidence}`;
 
   async callAI(providers, messages, options = {}) {
     const providerList = Array.isArray(providers) ? providers : [providers];
-    const availableProviders = providerList.filter(p => aiProviders[p] && p !== 'mock');
+    const availableProviders = providerList.filter(p => aiProviders[p]);
 
     if (availableProviders.length === 0) {
-      logger.warn('No AI providers available, using mock response');
-      return {
-        content: 'No AI providers configured. Echoing your message as fallback: ' + messages[messages.length - 1].content,
-        provider: 'mock',
-        model: 'fallback',
-        usage: {},
-        finishReason: 'mock'
-      };
+      throw new Error('No AI providers available');
     }
 
     const cacheKey = `ai_${crypto.createHash('md5').update(JSON.stringify({ messages, options })).digest('hex')}`;
@@ -1186,14 +1164,7 @@ Confidence: ${reasoning.confidence}`;
       }
     }
     
-    // If all fail, use mock
-    return {
-      content: 'All AI providers failed. Echoing your message: ' + messages[messages.length - 1].content,
-      provider: 'mock',
-      model: 'fallback',
-      usage: {},
-      finishReason: 'mock'
-    };
+    throw new Error('All AI providers failed');
   }
 
   updateProviderWeight(provider, success) {
