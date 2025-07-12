@@ -1,14 +1,22 @@
 {
-  "name": "advanced-agi-agent",
+  "name": "enhanced-agi-agent",
   "version": "2.0.0",
-  "description": "Advanced AGI Agent with memory, tools, and multi-provider AI support",
+  "description": "Enhanced AGI Agent with memory, tools, multi-provider AI support, and Railway deployment optimization",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "build": "echo 'Build completed'",
-    "dev": "nodemon index.js",
-    "test": "echo 'No tests specified'"
+    "build": "echo 'Build completed - No build process required'",
+    "dev": "nodemon index.js --ignore logs/ --ignore *.log",
+    "test": "node --experimental-vm-modules --experimental-json-modules test.js",
+    "test:health": "curl -f http://localhost:3000/health || exit 1",
+    "test:chat": "node test-chat.js",
+    "db:migrate": "node migrate.js",
+    "logs": "tail -f logs/app.log",
+    "clean": "rm -rf logs/*.log && rm -rf node_modules/.cache",
+    "railway:deploy": "railway up",
+    "railway:logs": "railway logs",
+    "validate": "node validate-config.js"
   },
   "keywords": [
     "ai",
@@ -16,13 +24,18 @@
     "chatbot",
     "openai",
     "deepseek",
-    "anthropic"
+    "anthropic",
+    "websocket",
+    "memory",
+    "tools",
+    "railway",
+    "postgresql"
   ],
-  "author": "AGI Agent Developer",
+  "author": "Enhanced AGI Agent Developer",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "npm": ">=9.0.0"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -40,5 +53,42 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/enhanced-agi-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/enhanced-agi-agent/issues"
+  },
+  "homepage": "https://github.com/your-username/enhanced-agi-agent#readme",
+  "railway": {
+    "build": {
+      "command": "npm install"
+    },
+    "start": {
+      "command": "npm start"
+    }
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "$PORT",
+    "DATABASE_URL": "$DATABASE_URL",
+    "OPENAI_API_KEY": "$OPENAI_API_KEY",
+    "DEEPSEEK_API_KEY": "$DEEPSEEK_API_KEY",
+    "ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
+    "SESSION_SECRET": "$SESSION_SECRET",
+    "LOG_LEVEL": "info",
+    "ALLOWED_ORIGINS": "*"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "logs/",
+      "*.log",
+      "node_modules/",
+      ".git/"
+    ],
+    "ext": "js,json",
+    "delay": 1000
   }
 }
