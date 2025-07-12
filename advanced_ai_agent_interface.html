@@ -354,7 +354,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 this.debugLogs.push({ message: logEntry, type });
                 console.log(logEntry);
                 
-                // Debug panelini güncelle
                 const logDiv = document.createElement('div');
                 logDiv.className = 'debug-log';
                 logDiv.style.color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#00ff00';
@@ -363,7 +362,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 this.debugPanel.appendChild(logDiv);
                 this.debugPanel.scrollTop = this.debugPanel.scrollHeight;
                 
-                // En fazla 50 log tutma
                 if (this.debugLogs.length > 50) {
                     this.debugLogs.shift();
                     if (this.debugPanel.firstChild) {
@@ -376,7 +374,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 this.log('🔍 Sunucu bağlantısı test ediliyor...');
                 
                 try {
-                    // Health endpoint test
                     const healthResponse = await fetch(`${this.API_URL}/health`, {
                         method: 'GET',
                         headers: {
@@ -401,7 +398,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     document.getElementById('statusIndicator').style.background = '#ef4444';
                 }
                 
-                // Chat endpoint test
                 try {
                     this.log('🧪 Chat endpoint test yapılıyor...');
                     
@@ -434,14 +430,12 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
             }
             
             initEventListeners() {
-                // Send button click event
                 this.sendButton.addEventListener('click', (e) => {
                     e.preventDefault();
                     this.log('🖱️ Send button clicked');
                     this.sendMessage();
                 });
                 
-                // Enter key event
                 this.messageInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -450,12 +444,10 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     }
                 });
                 
-                // Input change event
                 this.messageInput.addEventListener('input', () => {
                     this.updateSendButton();
                 });
                 
-                // Focus event
                 this.messageInput.addEventListener('focus', () => {
                     this.log('🎯 Input focused');
                 });
@@ -479,7 +471,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 
                 this.log(`📤 Mesaj gönderiliyor: "${message}"`);
                 
-                // UI'yi güncelle
                 this.addMessage({
                     role: 'user',
                     content: message,
@@ -522,14 +513,13 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     }
                     
                     const data = await response.json();
-                    this.log(`📄 Response data: ${JSON.stringify(data, null, 2)}`);
+                    this.log(`📄 Response data received: ${Object.keys(data).join(', ')}`);
                     
                     this.hideTyping();
                     
-                    // Assistant cevabını ekle
                     this.addMessage({
                         role: 'assistant',
-                        content: data.response || data.message || 'Cevap alındı',
+                        content: data.response || data.content || 'Cevap alındı',
                         provider: data.provider,
                         model: data.model,
                         processingTime: data.processingTime,
@@ -571,7 +561,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 const bubble = document.createElement('div');
                 bubble.className = 'message-bubble';
                 
-                // Header
                 const header = document.createElement('div');
                 header.className = 'message-header';
                 
@@ -595,7 +584,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 
                 bubble.appendChild(header);
                 
-                // Content
                 const content = document.createElement('div');
                 content.className = 'message-content';
                 content.textContent = message.content;
@@ -606,7 +594,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 
                 bubble.appendChild(content);
                 
-                // Processing time
                 if (message.processingTime) {
                     const meta = document.createElement('div');
                     meta.style.fontSize = '11px';
@@ -664,7 +651,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
             }
         }
         
-        // Sayfa yüklendiğinde başlat
         document.addEventListener('DOMContentLoaded', () => {
             try {
                 window.debugChat = new DebugAGIChat();
@@ -674,7 +660,6 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
             }
         });
         
-        // Error handling
         window.addEventListener('error', (e) => {
             console.error('Global error:', e.error);
             if (window.debugChat) {
