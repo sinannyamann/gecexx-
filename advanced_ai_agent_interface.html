@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 Advanced AGI Agent - Debug</title>
+    <title>🤖 Enhanced AGI Agent - Debug Interface</title>
     <style>
         * {
             margin: 0;
@@ -19,6 +19,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            color: #333;
         }
         
         .chat-container {
@@ -26,12 +27,13 @@
             backdrop-filter: blur(10px);
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 900px;
+            max-width: 1000px;
             width: 100%;
-            height: 700px;
+            height: 85vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
         
         .chat-header {
@@ -57,11 +59,13 @@
             background: #4ade80;
             border-radius: 50%;
             animation: pulse 2s infinite;
+            cursor: pointer;
+            title: "System Status";
         }
         
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
         }
         
         .stats-bar {
@@ -69,8 +73,26 @@
             padding: 10px 25px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 12px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .connection-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .connection-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
         
         .messages-container {
@@ -78,6 +100,7 @@
             overflow-y: auto;
             padding: 25px;
             background: #f8fafc;
+            scroll-behavior: smooth;
         }
         
         .message {
@@ -98,6 +121,11 @@
         .message.assistant {
             display: flex;
             justify-content: flex-start;
+        }
+        
+        .message.system {
+            display: flex;
+            justify-content: center;
         }
         
         .message-bubble {
@@ -123,6 +151,14 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
         
+        .message.system .message-bubble {
+            background: rgba(59, 130, 246, 0.1);
+            color: #1e40af;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            max-width: 90%;
+            text-align: center;
+        }
+        
         .message-header {
             font-size: 13px;
             opacity: 0.8;
@@ -136,6 +172,15 @@
         .message-content {
             white-space: pre-wrap;
             line-height: 1.6;
+        }
+        
+        .message-meta {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
         .typing-indicator {
@@ -232,27 +277,43 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             color: #00ff00;
             padding: 15px;
             border-radius: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            max-width: 300px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            max-width: 350px;
             max-height: 400px;
             overflow-y: auto;
             z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 0, 0.3);
         }
         
         .debug-title {
             color: #ffff00;
             font-weight: bold;
             margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .debug-toggle {
+            background: none;
+            border: 1px solid #ffff00;
+            color: #ffff00;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            cursor: pointer;
         }
         
         .debug-log {
             margin-bottom: 5px;
-            opacity: 0.8;
+            opacity: 0.9;
+            word-break: break-all;
         }
         
         .error-message {
@@ -272,42 +333,149 @@
             font-size: 11px;
             font-weight: 600;
         }
+        
+        .confidence-bar {
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .tools-used {
+            margin-top: 10px;
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .tool-badge {
+            background: rgba(168, 85, 247, 0.15);
+            color: #8b5cf6;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 10px;
+            margin-right: 5px;
+        }
+        
+        .websocket-status {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .feature-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .feature-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .feature-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .debug-panel {
+                position: relative;
+                top: 0;
+                left: 0;
+                margin-bottom: 20px;
+                max-width: 100%;
+            }
+            
+            .chat-container {
+                height: 100vh;
+                border-radius: 0;
+            }
+            
+            .stats-bar {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- Debug Panel -->
     <div class="debug-panel" id="debugPanel">
-        <div class="debug-title">🔧 Debug Console</div>
+        <div class="debug-title">
+            🔧 Debug Console
+            <button class="debug-toggle" onclick="toggleDebug()">Hide</button>
+        </div>
         <div id="debugLogs"></div>
     </div>
 
     <div class="chat-container">
         <div class="chat-header">
-            <div class="status-indicator" id="statusIndicator"></div>
-            <h1>🤖 Advanced AGI Agent</h1>
-            <p>Debug Mode - Connection Testing</p>
+            <div class="websocket-status" id="wsStatus">🔌 HTTP</div>
+            <div class="status-indicator" id="statusIndicator" title="System Status"></div>
+            <h1>🤖 Enhanced AGI Agent</h1>
+            <p>Debug Interface - Advanced Testing</p>
             <div class="stats-bar">
                 <span id="messageCount">Messages: 0</span>
                 <span id="connectionStatus">Status: Testing...</span>
-                <span id="apiUrl">API: Loading...</span>
+                <span id="providerInfo">Provider: Loading...</span>
+                <button class="connection-toggle" onclick="toggleWebSocket()">Enable WebSocket</button>
+            </div>
+            <div class="feature-buttons">
+                <button class="feature-button" onclick="testEcho()">Test Echo</button>
+                <button class="feature-button" onclick="testMemory()">Test Memory</button>
+                <button class="feature-button" onclick="testSystem()">System Info</button>
+                <button class="feature-button" onclick="clearChat()">Clear Chat</button>
             </div>
         </div>
         
         <div class="messages-container" id="messages">
-            <div class="message assistant">
+            <div class="message system">
                 <div class="message-bubble">
-                    <div class="message-header">
-                        <strong>System</strong>
-                        <span style="margin-left: auto; font-size: 11px; opacity: 0.6;"></span>
-                    </div>
-                    <div class="message-content">🔧 Debug Mode Aktif! 
+                    <div class="message-content">🔧 Enhanced Debug Mode Aktif!
 
-Sistem bağlantısı test ediliyor...
-- API endpoint kontrolü
-- Server durumu testi
-- WebSocket bağlantısı testi
+Sistem özellikleri test ediliyor:
+- ✅ API endpoint bağlantısı
+- ✅ Multi-provider AI desteği  
+- ✅ WebSocket real-time iletişim
+- ✅ Hafıza ve tool sistemi
+- ✅ Hata kurtarma mekanizmaları
 
-Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
+Test komutları için yukarıdaki butonları kullanın veya doğrudan sohbet edin.</div>
                 </div>
             </div>
         </div>
@@ -317,7 +485,7 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 <textarea 
                     id="messageInput" 
                     class="message-input" 
-                    placeholder="Debug mesajı yazın... (Enter = gönder)"
+                    placeholder="Enhanced AGI Agent ile sohbet edin... (Enter = gönder, Shift+Enter = yeni satır)"
                     rows="1"
                 ></textarea>
                 <button id="sendButton" class="send-button" type="button">Send</button>
@@ -326,43 +494,54 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
     </div>
 
     <script>
-        class DebugAGIChat {
+        class EnhancedAGIDebugChat {
             constructor() {
                 this.messages = [];
                 this.messageCount = 0;
                 this.debugLogs = [];
                 this.API_URL = window.location.origin;
                 this.isProcessing = false;
+                this.useWebSocket = false;
+                this.ws = null;
+                this.sessionId = this.generateSessionId();
                 
                 this.messagesContainer = document.getElementById('messages');
                 this.messageInput = document.getElementById('messageInput');
                 this.sendButton = document.getElementById('sendButton');
                 this.debugPanel = document.getElementById('debugLogs');
                 
-                this.log('🚀 Debug Chat başlatılıyor...');
+                this.log('🚀 Enhanced AGI Debug Chat başlatılıyor...');
                 this.log(`📍 API URL: ${this.API_URL}`);
+                this.log(`🆔 Session ID: ${this.sessionId}`);
                 
                 this.initEventListeners();
                 this.testConnection();
                 this.updateDisplay();
+                this.startPerformanceMonitoring();
+            }
+            
+            generateSessionId() {
+                return 'debug_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
             }
             
             log(message, type = 'info') {
                 const timestamp = new Date().toLocaleTimeString();
                 const logEntry = `[${timestamp}] ${message}`;
                 
-                this.debugLogs.push({ message: logEntry, type });
+                this.debugLogs.push({ message: logEntry, type, timestamp: Date.now() });
                 console.log(logEntry);
                 
                 const logDiv = document.createElement('div');
                 logDiv.className = 'debug-log';
-                logDiv.style.color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#00ff00';
+                logDiv.style.color = type === 'error' ? '#ff6b6b' : 
+                                   type === 'success' ? '#51cf66' : 
+                                   type === 'warning' ? '#ffd43b' : '#00ff00';
                 logDiv.textContent = logEntry;
                 
                 this.debugPanel.appendChild(logDiv);
                 this.debugPanel.scrollTop = this.debugPanel.scrollHeight;
                 
-                if (this.debugLogs.length > 50) {
+                if (this.debugLogs.length > 100) {
                     this.debugLogs.shift();
                     if (this.debugPanel.firstChild) {
                         this.debugPanel.removeChild(this.debugPanel.firstChild);
@@ -370,24 +549,48 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 }
             }
             
+            showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.style.background = type === 'error' ? 'rgba(239, 68, 68, 0.9)' : 
+                                        type === 'success' ? 'rgba(16, 185, 129, 0.9)' : 
+                                        'rgba(0, 0, 0, 0.8)';
+                toast.textContent = message;
+                
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            }
+            
             async testConnection() {
-                this.log('🔍 Sunucu bağlantısı test ediliyor...');
+                this.log('🔍 Enhanced sistem bağlantısı test ediliyor...');
                 
                 try {
+                    // Health endpoint test
                     const healthResponse = await fetch(`${this.API_URL}/health`, {
                         method: 'GET',
-                        headers: {
-                            'Accept': 'application/json'
-                        }
+                        headers: { 'Accept': 'application/json' }
                     });
                     
-                    this.log(`📡 Health endpoint: ${healthResponse.status}`, healthResponse.ok ? 'success' : 'error');
+                    this.log(`📡 Health endpoint: ${healthResponse.status}`, 
+                             healthResponse.ok ? 'success' : 'error');
                     
                     if (healthResponse.ok) {
                         const healthData = await healthResponse.json();
-                        this.log(`✅ Server online: ${healthData.service || 'AGI Agent'}`, 'success');
+                        this.log(`✅ Server: ${healthData.service} v${healthData.version}`, 'success');
+                        this.log(`💾 Database: ${healthData.database ? 'Connected' : 'Memory Only'}`, 
+                                healthData.database ? 'success' : 'warning');
+                        this.log(`🤖 Providers: ${Object.keys(healthData.providers || {}).join(', ')}`, 'success');
+                        
                         document.getElementById('connectionStatus').textContent = 'Status: Online';
                         document.getElementById('statusIndicator').style.background = '#4ade80';
+                        
+                        // Update provider info
+                        const providers = Object.keys(healthData.providers || {});
+                        document.getElementById('providerInfo').textContent = 
+                            `Providers: ${providers.length} (${providers.join(', ')})`;
                     } else {
                         throw new Error(`Health check failed: ${healthResponse.status}`);
                     }
@@ -398,6 +601,7 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     document.getElementById('statusIndicator').style.background = '#ef4444';
                 }
                 
+                // Chat endpoint test
                 try {
                     this.log('🧪 Chat endpoint test yapılıyor...');
                     
@@ -408,15 +612,19 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                             'Accept': 'application/json'
                         },
                         body: JSON.stringify({
-                            message: 'test connection'
+                            message: 'sistem test mesajı',
+                            options: { test: true }
                         })
                     });
                     
-                    this.log(`📝 Chat endpoint: ${testResponse.status}`, testResponse.ok ? 'success' : 'error');
+                    this.log(`📝 Chat endpoint: ${testResponse.status}`, 
+                             testResponse.ok ? 'success' : 'error');
                     
                     if (testResponse.ok) {
                         const testData = await testResponse.json();
-                        this.log(`✅ Chat endpoint working: ${testData.provider || 'OK'}`, 'success');
+                        this.log(`✅ Chat working: ${testData.provider}/${testData.model}`, 'success');
+                        this.log(`⚡ Response time: ${testData.processingTime}ms`, 'success');
+                        this.sessionId = testData.sessionId || this.sessionId;
                     } else {
                         const errorText = await testResponse.text();
                         this.log(`❌ Chat endpoint error: ${errorText}`, 'error');
@@ -425,43 +633,46 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 } catch (error) {
                     this.log(`❌ Chat test failed: ${error.message}`, 'error');
                 }
-                
-                document.getElementById('apiUrl').textContent = `API: ${this.API_URL}`;
             }
             
             initEventListeners() {
                 this.sendButton.addEventListener('click', (e) => {
                     e.preventDefault();
-                    this.log('🖱️ Send button clicked');
                     this.sendMessage();
                 });
                 
                 this.messageInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        this.log('⌨️ Enter key pressed');
                         this.sendMessage();
                     }
                 });
                 
                 this.messageInput.addEventListener('input', () => {
                     this.updateSendButton();
+                    this.autoResize();
                 });
                 
+                // Auto-resize textarea
                 this.messageInput.addEventListener('focus', () => {
                     this.log('🎯 Input focused');
                 });
             }
             
-            async sendMessage() {
+            autoResize() {
+                this.messageInput.style.height = 'auto';
+                this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
+            }
+            
+            async sendMessage(message = null) {
                 if (this.isProcessing) {
-                    this.log('⚠️ Zaten işlem devam ediyor, bekleyin...', 'error');
+                    this.log('⚠️ Zaten işlem devam ediyor...', 'warning');
                     return;
                 }
 
-                const message = this.messageInput.value.trim();
-                if (!message) {
-                    this.log('⚠️ Boş mesaj gönderilmeye çalışıldı', 'error');
+                const messageText = message || this.messageInput.value.trim();
+                if (!messageText) {
+                    this.log('⚠️ Boş mesaj gönderilmeye çalışıldı', 'warning');
                     return;
                 }
                 
@@ -469,73 +680,51 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 this.sendButton.disabled = true;
                 this.sendButton.textContent = 'Sending...';
                 
-                this.log(`📤 Mesaj gönderiliyor: "${message}"`);
+                this.log(`📤 Mesaj gönderiliyor: "${messageText}"`);
                 
                 this.addMessage({
                     role: 'user',
-                    content: message,
+                    content: messageText,
                     timestamp: new Date().toLocaleTimeString()
                 });
                 
-                this.messageInput.value = '';
+                if (!message) {
+                    this.messageInput.value = '';
+                    this.autoResize();
+                }
                 this.updateSendButton();
                 this.showTyping();
                 
                 try {
-                    this.log('🔄 API isteği yapılıyor...');
+                    let response;
                     
-                    const requestBody = {
-                        message: message,
-                        options: {
-                            debug: true,
-                            timestamp: Date.now()
-                        }
-                    };
-                    
-                    this.log(`📦 Request body: ${JSON.stringify(requestBody)}`);
-                    
-                    const response = await fetch(`${this.API_URL}/api/chat`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        credentials: 'include',
-                        body: JSON.stringify(requestBody)
-                    });
-                    
-                    this.log(`📨 Response status: ${response.status}`);
-                    this.log(`📋 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
-                    
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    if (this.useWebSocket && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        response = await this.sendWebSocketMessage(messageText);
+                    } else {
+                        response = await this.sendHttpMessage(messageText);
                     }
                     
-                    const data = await response.json();
-                    this.log(`📄 Response data received: ${Object.keys(data).join(', ')}`);
-                    
                     this.hideTyping();
-                    
                     this.addMessage({
                         role: 'assistant',
-                        content: data.response || data.content || 'Cevap alındı',
-                        provider: data.provider,
-                        model: data.model,
-                        processingTime: data.processingTime,
+                        content: response.response || response.content || 'Cevap alındı',
+                        provider: response.provider,
+                        model: response.model,
+                        processingTime: response.processingTime,
+                        confidence: response.confidence,
+                        toolsUsed: response.toolsUsed,
+                        fromCache: response.fromCache,
                         timestamp: new Date().toLocaleTimeString()
                     });
                     
-                    this.log('✅ Mesaj başarıyla alındı!', 'success');
+                    this.log(`✅ Cevap alındı: ${response.processingTime}ms`, 'success');
                     
                 } catch (error) {
                     this.log(`❌ Mesaj gönderme hatası: ${error.message}`, 'error');
-                    
                     this.hideTyping();
-                    
                     this.addMessage({
                         role: 'assistant',
-                        content: `❌ Hata oluştu: ${error.message}\n\n🔧 Debug bilgileri:\n• API URL: ${this.API_URL}/api/chat\n• Network error veya server offline\n• Console'u kontrol edin`,
+                        content: `❌ Hata: ${error.message}\n\n🔧 Debug bilgileri:\n• API: ${this.API_URL}/api/chat\n• Session: ${this.sessionId}\n• WebSocket: ${this.useWebSocket ? 'Enabled' : 'Disabled'}`,
                         error: true,
                         timestamp: new Date().toLocaleTimeString()
                     });
@@ -545,6 +734,108 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     this.sendButton.textContent = 'Send';
                     this.updateSendButton();
                 }
+            }
+            
+            async sendHttpMessage(message) {
+                this.log('🔄 HTTP API isteği yapılıyor...');
+                
+                const requestBody = {
+                    message: message,
+                    options: {
+                        debug: true,
+                        timestamp: Date.now(),
+                        sessionId: this.sessionId
+                    }
+                };
+                
+                this.log(`📦 Request body: ${JSON.stringify(requestBody, null, 2)}`);
+                
+                const response = await fetch(`${this.API_URL}/api/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(requestBody)
+                });
+                
+                this.log(`📨 HTTP Response: ${response.status}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                return await response.json();
+            }
+            
+            async sendWebSocketMessage(message) {
+                this.log('⚡ WebSocket mesajı gönderiliyor...');
+                
+                return new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('WebSocket timeout'));
+                    }, 30000);
+                    
+                    const handler = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.type === 'response') {
+                                clearTimeout(timeout);
+                                this.ws.removeEventListener('message', handler);
+                                resolve(data.data);
+                            } else if (data.type === 'error') {
+                                clearTimeout(timeout);
+                                this.ws.removeEventListener('message', handler);
+                                reject(new Error(data.error));
+                            }
+                        } catch (error) {
+                            clearTimeout(timeout);
+                            this.ws.removeEventListener('message', handler);
+                            reject(error);
+                        }
+                    };
+                    
+                    this.ws.addEventListener('message', handler);
+                    this.ws.send(JSON.stringify({
+                        type: 'chat',
+                        content: message,
+                        sessionId: this.sessionId
+                    }));
+                });
+            }
+            
+            initWebSocket() {
+                if (this.ws) {
+                    this.ws.close();
+                }
+                
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws`;
+                
+                this.log(`🔌 WebSocket bağlanıyor: ${wsUrl}`);
+                
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    this.log('✅ WebSocket bağlandı!', 'success');
+                    document.getElementById('wsStatus').textContent = '🔌 WebSocket';
+                    document.getElementById('wsStatus').style.background = 'rgba(34, 197, 94, 0.3)';
+                    this.showToast('WebSocket bağlantısı kuruldu!', 'success');
+                };
+                
+                this.ws.onclose = () => {
+                    this.log('🔌 WebSocket bağlantısı kapandı', 'warning');
+                    document.getElementById('wsStatus').textContent = '🔌 HTTP';
+                    document.getElementById('wsStatus').style.background = 'rgba(255, 255, 255, 0.2)';
+                    this.useWebSocket = false;
+                };
+                
+                this.ws.onerror = (error) => {
+                    this.log(`❌ WebSocket hatası: ${error}`, 'error');
+                    this.showToast('WebSocket bağlantı hatası!', 'error');
+                };
             }
             
             addMessage(message) {
@@ -565,7 +856,8 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 header.className = 'message-header';
                 
                 const sender = document.createElement('strong');
-                sender.textContent = message.role === 'user' ? 'You' : 'AGI Agent';
+                sender.textContent = message.role === 'user' ? 'You' : 
+                                   message.role === 'system' ? 'System' : 'AGI Agent';
                 header.appendChild(sender);
                 
                 const timestamp = document.createElement('span');
@@ -578,8 +870,17 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 if (message.provider) {
                     const providerBadge = document.createElement('span');
                     providerBadge.className = 'provider-badge';
-                    providerBadge.textContent = message.provider;
+                    providerBadge.textContent = `${message.provider}${message.model ? `/${message.model}` : ''}`;
                     header.appendChild(providerBadge);
+                }
+                
+                if (message.fromCache) {
+                    const cacheBadge = document.createElement('span');
+                    cacheBadge.className = 'provider-badge';
+                    cacheBadge.style.background = 'rgba(168, 85, 247, 0.15)';
+                    cacheBadge.style.color = '#8b5cf6';
+                    cacheBadge.textContent = 'Cached';
+                    header.appendChild(cacheBadge);
                 }
                 
                 bubble.appendChild(header);
@@ -594,12 +895,43 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                 
                 bubble.appendChild(content);
                 
-                if (message.processingTime) {
+                // Confidence bar
+                if (message.confidence !== undefined) {
+                    const confidenceContainer = document.createElement('div');
+                    confidenceContainer.innerHTML = `
+                        <div style="font-size: 11px; opacity: 0.6; margin-top: 8px;">
+                            Confidence: ${(message.confidence * 100).toFixed(1)}%
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${message.confidence * 100}%"></div>
+                        </div>
+                    `;
+                    bubble.appendChild(confidenceContainer);
+                }
+                
+                // Tools used
+                if (message.toolsUsed && message.toolsUsed.length > 0) {
+                    const toolsDiv = document.createElement('div');
+                    toolsDiv.className = 'tools-used';
+                    toolsDiv.innerHTML = `
+                        <div style="margin-bottom: 5px;">Tools used:</div>
+                        ${message.toolsUsed.map(tool => 
+                            `<span class="tool-badge">${tool.tool || tool.name || 'Unknown'}</span>`
+                        ).join('')}
+                    `;
+                    bubble.appendChild(toolsDiv);
+                }
+                
+                // Message metadata
+                const metaParts = [];
+                if (message.processingTime) metaParts.push(`${message.processingTime}ms`);
+                if (message.provider) metaParts.push(message.provider);
+                if (message.model) metaParts.push(message.model);
+                
+                if (metaParts.length > 0) {
                     const meta = document.createElement('div');
-                    meta.style.fontSize = '11px';
-                    meta.style.opacity = '0.6';
-                    meta.style.marginTop = '8px';
-                    meta.textContent = `Processing: ${message.processingTime}ms`;
+                    meta.className = 'message-meta';
+                    meta.textContent = metaParts.join(' • ');
                     bubble.appendChild(meta);
                 }
                 
@@ -649,21 +981,141 @@ Mesaj göndermeyi test etmek için bir şeyler yazın.</div>
                     this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
                 }, 50);
             }
+            
+            startPerformanceMonitoring() {
+                setInterval(() => {
+                    this.logPerformanceMetrics();
+                }, 30000); // Every 30 seconds
+            }
+            
+            logPerformanceMetrics() {
+                const memory = performance.memory;
+                if (memory) {
+                    this.log(`📊 Memory: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(1)}MB used, ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(1)}MB total`);
+                }
+                
+                this.log(`💬 Debug Session: ${this.messageCount} messages, ${this.debugLogs.length} logs`);
+            }
         }
         
+        // Global functions for feature buttons
+        let debugChat;
+        
+        function toggleWebSocket() {
+            if (!debugChat.useWebSocket) {
+                debugChat.useWebSocket = true;
+                debugChat.initWebSocket();
+                debugChat.log('🔌 WebSocket etkinleştiriliyor...', 'info');
+            } else {
+                debugChat.useWebSocket = false;
+                if (debugChat.ws) {
+                    debugChat.ws.close();
+                }
+                debugChat.log('🔌 WebSocket devre dışı bırakılıyor...', 'warning');
+            }
+        }
+        
+        function testEcho() {
+            const testMessage = `Echo test - ${new Date().toLocaleTimeString()}`;
+            debugChat.log('🔊 Echo tool testi başlatılıyor...', 'info');
+            debugChat.sendMessage(testMessage);
+        }
+        
+        function testMemory() {
+            const testData = {
+                timestamp: Date.now(),
+                testValue: Math.random().toString(36).substr(2, 9)
+            };
+            const testMessage = `Hafızaya şunu kaydet: test_data = ${JSON.stringify(testData)}`;
+            debugChat.log('💾 Memory tool testi başlatılıyor...', 'info');
+            debugChat.sendMessage(testMessage);
+        }
+        
+        function testSystem() {
+            debugChat.log('🖥️ System info tool testi başlatılıyor...', 'info');
+            debugChat.sendMessage('Sistem durumunu göster');
+        }
+        
+        function clearChat() {
+            debugChat.messages = [];
+            debugChat.messageCount = 0;
+            debugChat.messagesContainer.innerHTML = `
+                <div class="message system">
+                    <div class="message-bubble">
+                        <div class="message-content">🧹 Chat temizlendi! Yeni bir oturum başladı.</div>
+                    </div>
+                </div>
+            `;
+            debugChat.updateDisplay();
+            debugChat.log('🧹 Chat geçmişi temizlendi', 'info');
+            debugChat.sessionId = debugChat.generateSessionId();
+            debugChat.log(`🆔 Yeni Session ID: ${debugChat.sessionId}`, 'info');
+        }
+        
+        function toggleDebug() {
+            const panel = document.getElementById('debugPanel');
+            const toggle = document.querySelector('.debug-toggle');
+            
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                toggle.textContent = 'Hide';
+            } else {
+                panel.style.display = 'none';
+                toggle.textContent = 'Show';
+            }
+        }
+        
+        // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             try {
-                window.debugChat = new DebugAGIChat();
-                console.log('Debug chat initialized successfully');
+                debugChat = new EnhancedAGIDebugChat();
+                console.log('Enhanced AGI Debug Chat initialized successfully');
+                
+                // Test some advanced features
+                setTimeout(() => {
+                    debugChat.log('🎯 Auto-testing advanced features...', 'info');
+                }, 2000);
+                
             } catch (error) {
                 console.error('Failed to initialize debug chat:', error);
+                document.body.innerHTML = `
+                    <div style="padding: 50px; text-align: center; color: red;">
+                        <h1>❌ Initialization Error</h1>
+                        <p>Failed to initialize Enhanced AGI Debug Chat</p>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
             }
         });
         
+        // Global error handling
         window.addEventListener('error', (e) => {
             console.error('Global error:', e.error);
-            if (window.debugChat) {
-                window.debugChat.log(`❌ Global error: ${e.error.message}`, 'error');
+            if (debugChat) {
+                debugChat.log(`❌ Global error: ${e.error.message}`, 'error');
+                debugChat.showToast('JavaScript error occurred!', 'error');
+            }
+        });
+        
+        // Performance monitoring
+        window.addEventListener('load', () => {
+            if (debugChat) {
+                debugChat.log('🚀 Page fully loaded and ready', 'success');
+            }
+        });
+        
+        // Connection monitoring
+        window.addEventListener('online', () => {
+            if (debugChat) {
+                debugChat.log('🌐 Internet connection restored', 'success');
+                debugChat.showToast('Connection restored!', 'success');
+            }
+        });
+        
+        window.addEventListener('offline', () => {
+            if (debugChat) {
+                debugChat.log('🌐 Internet connection lost', 'error');
+                debugChat.showToast('Connection lost!', 'error');
             }
         });
     </script>
