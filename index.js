@@ -26,7 +26,7 @@ const __dirname = dirname(__filename);
 
 // Enhanced Configuration with Railway optimizations
 const config = {
-  port: process.env.PORT || 3000,
+  port: process.env.PORT || 5000,
   host: '0.0.0.0',
   maxTokens: 8000,
   defaultModel: 'gpt-4o-mini',
