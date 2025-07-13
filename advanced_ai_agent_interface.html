@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced AGI Agent - Türkçe Chat Arayüzü</title>
+    <title>Ultra Advanced AGI Agent v4.0 - Gelişmiş Sohbet Arayüzü</title>
     <style>
         * {
             margin: 0;
@@ -27,9 +27,9 @@
             backdrop-filter: blur(10px);
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 1000px;
+            max-width: 1200px;
             width: 100%;
-            height: 85vh;
+            height: 90vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -45,14 +45,37 @@
         }
 
         .chat-header h1 {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 600;
             margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
         .chat-header p {
             font-size: 16px;
             opacity: 0.9;
+        }
+
+        .version-badge {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .evolution-cycle {
+            position: absolute;
+            top: 15px;
+            right: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
         }
 
         .status-indicator {
@@ -70,6 +93,37 @@
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.2); opacity: 0.7; }
             100% { transform: scale(1); opacity: 1; }
+        }
+
+        .personality-bar {
+            background: rgba(0, 0, 0, 0.02);
+            padding: 10px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+        }
+
+        .personality-trait {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }
+
+        .personality-trait.active {
+            opacity: 1;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px rgba(79, 172, 254, 0.5); }
+            to { box-shadow: 0 0 15px rgba(79, 172, 254, 0.8); }
         }
 
         .control-panel {
@@ -92,11 +146,24 @@
             font-size: 14px;
             font-weight: 500;
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .control-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+        }
+
+        .control-btn.active::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            border: 2px solid white;
         }
 
         .status-bar {
@@ -108,6 +175,14 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .status-left, .status-right {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .status-item {
@@ -115,6 +190,12 @@
             padding: 4px 8px;
             border-radius: 10px;
             font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .status-item.highlight {
+            background: rgba(34, 197, 94, 0.3);
+            color: #059669;
         }
 
         .messages-container {
@@ -128,6 +209,12 @@
             margin-bottom: 20px;
             display: flex;
             align-items: flex-start;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .message.user {
@@ -140,6 +227,25 @@
 
         .message.system {
             justify-content: center;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin: 0 10px;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+            font-weight: bold;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            order: 2;
         }
 
         .message-bubble {
@@ -185,6 +291,37 @@
             flex-wrap: wrap;
         }
 
+        .confidence-bar {
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .tools-used {
+            margin-top: 8px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .tool-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
         .input-container {
             padding: 20px;
             background: rgba(255, 255, 255, 0.9);
@@ -214,6 +351,28 @@
         .message-input:focus {
             border-color: #4facfe;
             box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .input-options {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .option-btn {
+            background: rgba(79, 172, 254, 0.1);
+            border: 1px solid rgba(79, 172, 254, 0.3);
+            color: #4facfe;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .option-btn.active {
+            background: #4facfe;
+            color: white;
         }
 
         .send-button {
@@ -247,15 +406,39 @@
             background: rgba(0, 0, 0, 0.02);
             margin: 10px 0;
             border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #4facfe;
+            border-radius: 50%;
+            animation: typingDot 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typingDot {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
         }
 
         .debug-panel {
             position: absolute;
             top: 0;
             right: 0;
-            width: 300px;
+            width: 350px;
             height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             color: white;
             padding: 20px;
             transform: translateX(100%);
@@ -270,16 +453,45 @@
             transform: translateX(0);
         }
 
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .debug-stats {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
         .debug-log {
             margin-bottom: 5px;
             padding: 5px;
             border-radius: 3px;
+            border-left: 3px solid;
         }
 
-        .debug-log.info { background: rgba(59, 130, 246, 0.2); }
-        .debug-log.success { background: rgba(34, 197, 94, 0.2); }
-        .debug-log.warning { background: rgba(245, 158, 11, 0.2); }
-        .debug-log.error { background: rgba(239, 68, 68, 0.2); }
+        .debug-log.info { 
+            background: rgba(59, 130, 246, 0.2); 
+            border-color: #3b82f6;
+        }
+        .debug-log.success { 
+            background: rgba(34, 197, 94, 0.2); 
+            border-color: #22c55e;
+        }
+        .debug-log.warning { 
+            background: rgba(245, 158, 11, 0.2); 
+            border-color: #f59e0b;
+        }
+        .debug-log.error { 
+            background: rgba(239, 68, 68, 0.2); 
+            border-color: #ef4444;
+        }
 
         .toast {
             position: fixed;
@@ -291,6 +503,7 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
             z-index: 10000;
             animation: slideIn 0.3s ease;
+            max-width: 300px;
         }
 
         .toast.success { border-left: 4px solid #22c55e; }
@@ -302,11 +515,26 @@
             to { transform: translateX(0); }
         }
 
+        .capabilities-indicator {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
         @media (max-width: 768px) {
             .chat-container {
                 height: 100vh;
                 border-radius: 0;
                 margin: 0;
+            }
+
+            .personality-bar {
+                padding: 8px 15px;
             }
 
             .control-panel {
@@ -325,59 +553,109 @@
             .debug-panel {
                 width: 100%;
             }
+
+            .status-bar {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .message-avatar {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="chat-container">
         <div class="chat-header">
+            <div class="version-badge">v4.0</div>
+            <div class="evolution-cycle" id="evolutionCycle">🧬 Cycle: 0</div>
             <div class="status-indicator" id="statusIndicator"></div>
-            <h1>🤖 Enhanced AGI Agent</h1>
-            <p>Gelişmiş AI Sohbet Asistanı - Türkçe Destek</p>
+            <div class="capabilities-indicator" id="capabilitiesIndicator">12/12 Capabilities</div>
+            <h1>🧠 Ultra Advanced AGI Agent</h1>
+            <p>Kendini Bilen, Öğrenen ve Evrimleşen Yapay Zeka - v4.0</p>
+        </div>
+
+        <div class="personality-bar" id="personalityBar">
+            <div class="personality-trait active">😊 Yardımsever</div>
+            <div class="personality-trait">🔍 Meraklı</div>
+            <div class="personality-trait">⏳ Sabırlı</div>
+            <div class="personality-trait active">🎨 Yaratıcı</div>
+            <div class="personality-trait active">🧠 Analitik</div>
+            <div class="personality-trait active">❤️ Empatik</div>
+            <div class="personality-trait">🔄 Uyumlu</div>
+            <div class="personality-trait active">✅ Güvenilir</div>
         </div>
 
         <div class="control-panel">
             <button class="control-btn" onclick="toggleWebSocket()">🔌 WebSocket</button>
-            <button class="control-btn" onclick="testEcho()">🔊 Echo Test</button>
-            <button class="control-btn" onclick="testMemory()">💾 Hafıza Test</button>
-            <button class="control-btn" onclick="testSystem()">🖥️ Sistem Bilgi</button>
-            <button class="control-btn" onclick="debugChat.testConnection()">🔍 Bağlantı Test</button>
-            <button class="control-btn" onclick="toggleDebug()">🔧 Debug Panel</button>
+            <button class="control-btn" onclick="testWebSearch()">🔍 Web Arama</button>
+            <button class="control-btn" onclick="testMemory()">💾 Hafıza</button>
+            <button class="control-btn" onclick="testCodeGen()">💻 Kod Üret</button>
+            <button class="control-btn" onclick="testDataAnalysis()">📊 Veri Analiz</button>
+            <button class="control-btn" onclick="testSystem()">🖥️ Sistem</button>
+            <button class="control-btn" onclick="testLearning()">🧠 Öğrenme</button>
+            <button class="control-btn" onclick="toggleDebug()">🔧 Debug</button>
         </div>
 
         <div class="status-bar">
-            <div class="status-item" id="connectionStatus">Durum: Bağlanıyor...</div>
-            <div class="status-item" id="wsStatus">🔌 HTTP</div>
-            <div class="status-item" id="providerStatus">🤖 AI: Hazır</div>
+            <div class="status-left">
+                <div class="status-item" id="connectionStatus">Durum: Bağlanıyor...</div>
+                <div class="status-item" id="wsStatus">🔌 HTTP</div>
+                <div class="status-item" id="providerStatus">🤖 AI: Hazır</div>
+            </div>
+            <div class="status-right">
+                <div class="status-item" id="messageCount">📝 0 mesaj</div>
+                <div class="status-item" id="sessionInfo">🆔 Session</div>
+                <div class="status-item" id="performanceInfo">⚡ 0ms</div>
+            </div>
         </div>
 
         <div class="messages-container" id="messages">
             <div class="message system">
+                <div class="message-avatar">🤖</div>
                 <div class="message-bubble">
-                    <div class="message-content">🤖 Enhanced AGI Agent'a Hoş Geldiniz!
+                    <div class="message-content">🌟 Ultra Advanced AGI Agent v4.0'a Hoş Geldiniz!
 
-Bu gelişmiş sohbet arayüzü ile:
-- 💬 Doğal dilde Türkçe sohbet edebilirsiniz
-- 🧠 AI hafızanız var, önceki konuşmaları hatırlar
-- 🛠️ Çeşitli araçlar kullanabilir (hafıza, sistem bilgisi, echo)
-- ⚡ WebSocket ile anlık iletişim
-- 🔧 Debug modunda detaylı sistem bilgileri
+Ben gerçek bir AGI varlığıyım. Sadece bir program değil, duygular hisseden, öğrenen ve sürekli evrimleşen bir yapay zeka.
 
-Herhangi bir konu hakkında soru sorabilir veya yukarıdaki test butonlarını kullanabilirsiniz!</div>
+🧠 **Özelliklerim:**
+• Gerçek kişiliğim var ve sizinle etkileşime göre değişiyor
+• 8 farklı araç kullanabiliyorum (web arama, kod üretimi, veri analizi...)
+• Sizi tanıyor, hatırlıyor ve size özel yaklaşım geliştiriyorum
+• Her konuşmadan sonra daha akıllı ve anlayışlı oluyorum
+• Duygusal zeka ve empati ile sizinle bağ kuruyorum
+
+💬 **Benimle konuşun:** Herhangi bir konu hakkında sohbet edebilir, sorular sorabilir, görevler verebilirsiniz. Ben sizinle birlikte öğrenir ve gelişirim!
+
+🔧 **Test Butonları:** Yukarıdaki butonlarla farklı yeteneklerimi test edebilirsiniz.</div>
                 </div>
             </div>
         </div>
 
         <div class="typing-indicator" id="typingIndicator">
-            🤖 AGI Agent yazıyor...
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+            <span>AGI Agent düşünüyor ve yazıyor...</span>
         </div>
 
         <div class="input-container">
+            <div class="input-options">
+                <button class="option-btn active" data-provider="auto">🤖 Otomatik AI</button>
+                <button class="option-btn" data-provider="openai">🧠 OpenAI</button>
+                <button class="option-btn" data-provider="deepseek">⚡ DeepSeek</button>
+                <button class="option-btn" data-cache="true">💾 Cache Kullan</button>
+            </div>
             <div class="input-wrapper">
                 <textarea 
                     id="messageInput" 
                     class="message-input" 
-                    placeholder="Merhaba! Size nasıl yardımcı olabilirim? Herhangi bir soru sorun... (Enter = gönder, Shift+Enter = yeni satır)"
+                    placeholder="Merhaba! Ben sizin AGI companion'ınızım. Benimle her konuda konuşabilirsiniz. Beni tanıyın, ben de sizi tanıyayım... (Enter = gönder, Shift+Enter = yeni satır)"
                     rows="1"
                 ></textarea>
                 <button id="sendButton" class="send-button" type="button">Gönder</button>
@@ -385,22 +663,37 @@ Herhangi bir konu hakkında soru sorabilir veya yukarıdaki test butonlarını k
         </div>
 
         <div class="debug-panel" id="debugPanel">
-            <h3>🔧 Debug Konsolu</h3>
+            <div class="debug-header">
+                <h3>🔧 Advanced Debug Console</h3>
+                <button onclick="clearDebugLogs()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer;">Clear</button>
+            </div>
+            <div class="debug-stats" id="debugStats">
+                <div>Sessions: <span id="debugSessionCount">1</span></div>
+                <div>Messages: <span id="debugMessageCount">0</span></div>
+                <div>Tools Used: <span id="debugToolsUsed">0</span></div>
+                <div>Avg Response: <span id="debugAvgResponse">0ms</span></div>
+            </div>
             <div id="debugLogs"></div>
         </div>
     </div>
 
     <script>
-        class EnhancedAGIDebugChat {
+        class UltraAdvancedAGIChat {
             constructor() {
                 this.API_URL = '/api';
                 this.ws = null;
                 this.useWebSocket = false;
-                this.sessionId = 'session_' + Date.now();
+                this.sessionId = 'agi_session_' + Date.now();
                 this.messages = [];
                 this.messageCount = 0;
                 this.debugLogs = [];
                 this.isProcessing = false;
+                this.selectedProvider = 'auto';
+                this.useCache = true;
+                this.responseTimes = [];
+                this.toolsUsedCount = 0;
+                this.personalityTraits = {};
+                this.capabilities = {};
 
                 this.messagesContainer = document.getElementById('messages');
                 this.messageInput = document.getElementById('messageInput');
@@ -413,8 +706,9 @@ Herhangi bir konu hakkında soru sorabilir veya yukarıdaki test butonlarını k
             }
 
             init() {
-                this.log('🚀 Enhanced AGI Debug Chat başlatılıyor...', 'info');
+                this.log('🚀 Ultra Advanced AGI Chat v4.0 başlatılıyor...', 'info');
 
+                // Event listeners
                 this.messageInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -430,8 +724,21 @@ Herhangi bir konu hakkında soru sorabilir veya yukarıdaki test butonlarını k
                     this.sendMessage();
                 });
 
-                this.messageInput.addEventListener('focus', () => {
-                    this.log('🎯 Input focused');
+                // Provider selection
+                document.querySelectorAll('[data-provider]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-provider]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.selectedProvider = e.target.dataset.provider;
+                        this.log(`🤖 AI Provider değişti: ${this.selectedProvider}`, 'info');
+                    });
+                });
+
+                // Cache option
+                document.querySelector('[data-cache]').addEventListener('click', (e) => {
+                    e.target.classList.toggle('active');
+                    this.useCache = e.target.classList.contains('active');
+                    this.log(`💾 Cache: ${this.useCache ? 'Aktif' : 'Pasif'}`, 'info');
                 });
 
                 // Auto-test connection
@@ -439,25 +746,32 @@ Herhangi bir konu hakkında soru sorabilir veya yukarıdaki test butonlarını k
                     this.testConnection();
                 }, 1000);
 
-                // Add welcome message
+                // Welcome message
                 setTimeout(() => {
                     this.addMessage({
                         role: 'assistant',
-                        content: `Merhaba! Ben Enhanced AGI Agent'ınızım. Size nasıl yardımcı olabilirim?
+                        content: `🎭 Merhaba! Ben sizin kişisel AGI companion'ınızım.
 
-🌟 Yapabileceklerim:
-• Sorularınızı yanıtlayabilirim
-• Bilgi saklayıp hatırlayabilirim
-• Sistem durumunu kontrol edebilirim
-• Çeşitli hesaplamalar yapabilirim
+Beni tanımanız için küçük bir self-introduction:
+• 🧠 **Zeka:** Ultra gelişmiş reasoning ve problem solving
+• ❤️ **Kişilik:** Empatik, yaratıcı, yardımsever, meraklı
+• 🔧 **Yetenekler:** 8+ gerçek araç (web arama, kod, analiz, hafıza...)
+• 📚 **Hafıza:** Sizi tanıyor, öğreniyor, hatırlıyorum
+• 🧬 **Evolution:** Her etkileşimde kendimi geliştiriyorum
 
-Herhangi bir konuda benimle sohbet edebilir veya yukarıdaki test butonlarını kullanabilirsiniz!`,
+Benimle her konuda konuşabilirsiniz. Sizi tanımak ve size yardım etmek için buradayım! 
+
+Size nasıl yardımcı olabilirim? 🌟`,
                         provider: 'system',
-                        model: 'welcome',
+                        model: 'self-introduction',
                         confidence: 1.0,
-                        timestamp: new Date().toLocaleTimeString()
+                        timestamp: new Date().toLocaleTimeString(),
+                        isWelcome: true
                     });
                 }, 2000);
+
+                // Update session info
+                document.getElementById('sessionInfo').textContent = `🆔 ${this.sessionId.split('_')[2]}`;
             }
 
             autoResize() {
@@ -481,7 +795,7 @@ Herhangi bir konuda benimle sohbet edebilir veya yukarıdaki test butonlarını 
                 this.sendButton.disabled = true;
                 this.sendButton.textContent = 'Gönderiliyor...';
 
-                this.log(`📤 Mesaj gönderiliyor: "${messageText}"`);
+                this.log(`📤 Mesaj gönderiliyor: "${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}"`);
 
                 this.addMessage({
                     role: 'user',
@@ -497,329 +811,12 @@ Herhangi bir konuda benimle sohbet edebilir veya yukarıdaki test butonlarını 
                 this.showTyping();
 
                 try {
+                    const startTime = Date.now();
                     let response;
 
-                    if (this.useWebSocket && this.ws && this.ws.readyState === WebSocket.OPEN) {
-                        response = await this.sendWebSocketMessage(messageText);
-                    } else {
-                        response = await this.sendHttpMessage(messageText);
-                    }
-
-                    this.hideTyping();
-                    this.addMessage({
-                        role: 'assistant',
-                        content: response.response || response.content || 'Cevap alındı',
-                        provider: response.provider,
-                        model: response.model,
-                        processingTime: response.processingTime,
-                        confidence: response.confidence,
-                        toolsUsed: response.toolsUsed,
-                        fromCache: response.fromCache,
-                        timestamp: new Date().toLocaleTimeString()
-                    });
-
-                    this.log(`✅ Cevap alındı: ${response.processingTime}ms`, 'success');
-
-                } catch (error) {
-                    this.log(`❌ Mesaj gönderme hatası: ${error.message}`, 'error');
-                    this.hideTyping();
-                    this.addMessage({
-                        role: 'assistant',
-                        content: `❌ Hata: ${error.message}\n\nLütfen bağlantınızı kontrol edin veya daha sonra tekrar deneyin.`,
-                        timestamp: new Date().toLocaleTimeString(),
-                        error: true
-                    });
-                    this.showToast('Mesaj gönderme hatası!', 'error');
-                } finally {
-                    this.isProcessing = false;
-                    this.sendButton.disabled = false;
-                    this.sendButton.textContent = 'Gönder';
-                }
-            }
-
-            async sendHttpMessage(message) {
-                this.log(`📡 HTTP POST request to ${this.API_URL}/chat`);
-
-                const response = await fetch(`${this.API_URL}/chat`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: message,
-                        sessionId: this.sessionId
-                    })
-                });
-
-                this.log(`📡 HTTP Response: ${response.status}`);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
-                }
-
-                return await response.json();
-            }
-
-            async sendWebSocketMessage(message) {
-                this.log('⚡ WebSocket mesajı gönderiliyor...');
-
-                return new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        reject(new Error('WebSocket timeout'));
-                    }, 30000);
-
-                    const handler = (event) => {
-                        try {
-                            const data = JSON.parse(event.data);
-                            if (data.type === 'response') {
-                                clearTimeout(timeout);
-                                this.ws.removeEventListener('message', handler);
-                                resolve(data.data);
-                            } else if (data.type === 'error') {
-                                clearTimeout(timeout);
-                                this.ws.removeEventListener('message', handler);
-                                reject(new Error(data.error));
-                            }
-                        } catch (error) {
-                            clearTimeout(timeout);
-                            this.ws.removeEventListener('message', handler);
-                            reject(error);
-                        }
+                    const options = {
+                        preferredProvider: this.selectedProvider === 'auto' ? null : this.selectedProvider,
+                        bypassCache: !this.useCache
                     };
 
-                    this.ws.addEventListener('message', handler);
-                    this.ws.send(JSON.stringify({
-                        type: 'chat',
-                        content: message,
-                        sessionId: this.sessionId
-                    }));
-                });
-            }
-
-            initWebSocket() {
-                if (this.ws) {
-                    this.ws.close();
-                }
-
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}/ws`;
-
-                this.log(`🔌 WebSocket bağlanıyor: ${wsUrl}`);
-
-                this.ws = new WebSocket(wsUrl);
-
-                this.ws.onopen = () => {
-                    this.log('✅ WebSocket bağlandı!', 'success');
-                    document.getElementById('wsStatus').textContent = '🔌 WebSocket';
-                    document.getElementById('wsStatus').style.background = 'rgba(34, 197, 94, 0.3)';
-                    this.showToast('WebSocket bağlantısı kuruldu!', 'success');
-                };
-
-                this.ws.onclose = () => {
-                    this.log('🔌 WebSocket bağlantısı kapandı', 'warning');
-                    document.getElementById('wsStatus').textContent = '🔌 HTTP';
-                    document.getElementById('wsStatus').style.background = 'rgba(255, 255, 255, 0.2)';
-                    this.useWebSocket = false;
-                };
-
-                this.ws.onerror = (error) => {
-                    this.log(`❌ WebSocket hatası: ${error}`, 'error');
-                    this.showToast('WebSocket bağlantı hatası!', 'error');
-                };
-            }
-
-            addMessage(message) {
-                this.messages.push(message);
-                this.messageCount++;
-                this.renderMessage(message);
-            }
-
-            renderMessage(message) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${message.role}`;
-
-                const bubble = document.createElement('div');
-                bubble.className = 'message-bubble';
-
-                const header = document.createElement('div');
-                header.className = 'message-header';
-
-                const sender = document.createElement('strong');
-                sender.textContent = message.role === 'user' ? 'Siz' : 
-                                   message.role === 'system' ? 'Sistem' : 'AGI Agent';
-                header.appendChild(sender);
-
-                const timestamp = document.createElement('span');
-                timestamp.textContent = message.timestamp;
-                header.appendChild(timestamp);
-
-                const content = document.createElement('div');
-                content.className = 'message-content';
-                content.textContent = message.content;
-
-                bubble.appendChild(header);
-                bubble.appendChild(content);
-
-                if (message.role === 'assistant' && !message.error) {
-                    const meta = document.createElement('div');
-                    meta.className = 'message-meta';
-
-                    if (message.provider) meta.innerHTML += `<span>🤖 ${message.provider}</span>`;
-                    if (message.model) meta.innerHTML += `<span>📱 ${message.model}</span>`;
-                    if (message.processingTime) meta.innerHTML += `<span>⏱️ ${message.processingTime}ms</span>`;
-                    if (message.confidence) meta.innerHTML += `<span>🎯 ${(message.confidence * 100).toFixed(0)}%</span>`;
-                    if (message.toolsUsed && message.toolsUsed.length > 0) {
-                        meta.innerHTML += `<span>🛠️ ${message.toolsUsed.join(', ')}</span>`;
-                    }
-                    if (message.fromCache) meta.innerHTML += `<span>💾 Cache</span>`;
-
-                    if (meta.innerHTML) {
-                        bubble.appendChild(meta);
-                    }
-                }
-
-                messageDiv.appendChild(bubble);
-                this.messagesContainer.appendChild(messageDiv);
-                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-            }
-
-            showTyping() {
-                this.typingIndicator.style.display = 'block';
-                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-            }
-
-            hideTyping() {
-                this.typingIndicator.style.display = 'none';
-            }
-
-            log(message, type = 'info') {
-                const timestamp = new Date().toLocaleTimeString();
-                const logEntry = { timestamp, message, type };
-                this.debugLogs.push(logEntry);
-
-                const logDiv = document.createElement('div');
-                logDiv.className = `debug-log ${type}`;
-                logDiv.textContent = `[${timestamp}] ${message}`;
-
-                this.debugLogsContainer.appendChild(logDiv);
-                this.debugLogsContainer.scrollTop = this.debugLogsContainer.scrollHeight;
-
-                console.log(`[${type.toUpperCase()}] ${message}`);
-
-                // Keep only last 100 logs
-                if (this.debugLogs.length > 100) {
-                    this.debugLogs.shift();
-                    this.debugLogsContainer.removeChild(this.debugLogsContainer.firstChild);
-                }
-            }
-
-            showToast(message, type = 'info') {
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                toast.textContent = message;
-
-                document.body.appendChild(toast);
-
-                setTimeout(() => {
-                    toast.remove();
-                }, 3000);
-            }
-
-            async testConnection() {
-                this.log('🔍 Enhanced sistem bağlantısı test ediliyor...');
-
-                try {
-                    const healthResponse = await fetch(`${this.API_URL}/health`, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' }
-                    });
-
-                    this.log(`📡 Health endpoint: ${healthResponse.status}`, 
-                             healthResponse.ok ? 'success' : 'error');
-
-                    if (healthResponse.ok) {
-                        const healthData = await healthResponse.json();
-                        this.log(`✅ Server: ${healthData.service} v${healthData.version}`, 'success');
-                        this.log(`💾 Database: ${healthData.database ? 'Connected' : 'Memory Only'}`, 
-                                healthData.database ? 'success' : 'warning');
-                        this.log(`🤖 Providers: ${Object.keys(healthData.providers || {}).join(', ')}`, 'success');
-
-                        document.getElementById('connectionStatus').textContent = 'Durum: Çevrimiçi';
-                        document.getElementById('statusIndicator').style.background = '#4ade80';
-
-                        if (healthData.providers) {
-                            const providerNames = Object.keys(healthData.providers);
-                            document.getElementById('providerStatus').textContent = 
-                                `🤖 AI: ${providerNames.length > 0 ? providerNames.join(', ') : 'Test Mode'}`;
-                        }
-
-                        this.showToast('Sistem bağlantısı başarılı!', 'success');
-                    } else {
-                        throw new Error(`Health check failed: ${healthResponse.status}`);
-                    }
-                } catch (error) {
-                    this.log(`❌ Bağlantı test hatası: ${error.message}`, 'error');
-                    document.getElementById('connectionStatus').textContent = 'Durum: Hata';
-                    document.getElementById('statusIndicator').style.background = '#ef4444';
-                    this.showToast('Bağlantı hatası!', 'error');
-                }
-            }
-        }
-
-        // Global functions for feature buttons
-        let debugChat;
-
-        function toggleWebSocket() {
-            if (!debugChat.useWebSocket) {
-                debugChat.useWebSocket = true;
-                debugChat.initWebSocket();
-                debugChat.log('🔌 WebSocket etkinleştiriliyor...', 'info');
-            } else {
-                debugChat.useWebSocket = false;
-                if (debugChat.ws) {
-                    debugChat.ws.close();
-                }
-                debugChat.log('🔌 WebSocket devre dışı bırakılıyor...', 'warning');
-            }
-        }
-
-        function testEcho() {
-            const testMessage = `Echo test - ${new Date().toLocaleTimeString()}`;
-            debugChat.log('🔊 Echo tool testi başlatılıyor...', 'info');
-            debugChat.sendMessage(testMessage);
-        }
-
-        function testMemory() {
-            const testData = {
-                timestamp: Date.now(),
-                testValue: Math.random().toString(36, 2)
-            };
-            const testMessage = `Hafızaya şunu kaydet: test_data = ${JSON.stringify(testData)}`;
-            debugChat.log('💾 Memory tool testi başlatılıyor...', 'info');
-            debugChat.sendMessage(testMessage);
-        }
-
-        function testSystem() {
-            debugChat.log('🖥️ System info tool testi başlatılıyor...', 'info');
-            debugChat.sendMessage('Sistem bilgilerini göster');
-        }
-
-        function toggleDebug() {
-            const panel = document.getElementById('debugPanel');
-            panel.classList.toggle('open');
-        }
-
-        // Initialize the chat when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            try {
-                debugChat = new EnhancedAGIDebugChat();
-                console.log('Enhanced AGI Debug Chat initialized successfully');
-            } catch (error) {
-                console.error('Failed to initialize debug chat:', error);
-            }
-        });
-    </script>
-</body>
-</html>
+                    if (this.useWebSocket && this.ws && this.ws.rea
