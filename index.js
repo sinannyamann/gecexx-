@@ -1575,16 +1575,6 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: '2.0.0',
-    uptime: process.uptime()
-  });
-});
-
 // Enhanced stats endpoint
 app.get('/api/stats', async (req, res) => {
   try {
