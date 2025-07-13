@@ -1107,44 +1107,45 @@ Mevcut yeteneklerin:
 
   async healthCheck() {
     const now = Date.now();
-    if (now - this.lastHealthCheck < 30000) { // 30 seconds
-      return this.lastHealthCheckResult;
-    }
-
-    const healthStatus = {
-      timestamp: new Date().toISOString(),
-      uptime: now - this.startTime,
-      database: dbConnected,
-      providers: {},
-      memory: process.memoryUsage(),
-      performance: {
-        requests: this.requestCount,
-        errors: this.errorCount,
-        errorRate: this.requestCount > 0 ? this.errorCount / this.requestCount : 0
-      }
-    };
-
-    // Check AI providers
-    for (const [name, provider] of Object.entries(aiProviders)) {
-      if (provider) {
-        try {
-          if (name === 'openai') {
-            await provider.models.list();
-            healthStatus.providers[name] = 'healthy';
-          } else {
-            healthStatus.providers[name] = 'configured';
-          }
-        } catch (error) {
-          healthStatus.providers[name] = 'error';
+    
+    // Initialize if first check or cache expired
+    if (!this.lastHealthCheckResult || now - this.lastHealthCheck > 30000) {
+      const healthStatus = {
+        timestamp: new Date().toISOString(),
+        uptime: now - this.startTime,
+        database: dbConnected || false,
+        providers: {},
+        memory: process.memoryUsage(),
+        performance: {
+          requests: this.requestCount,
+          errors: this.errorCount,
+          errorRate: this.requestCount > 0 ? this.errorCount / this.requestCount : 0
         }
-      } else {
-        healthStatus.providers[name] = 'not_configured';
-      }
-    }
+      };
 
-    this.lastHealthCheck = now;
-    this.lastHealthCheckResult = healthStatus;
-    return healthStatus;
+      // Check AI providers
+      for (const [name, provider] of Object.entries(aiProviders)) {
+        if (provider) {
+          try {
+            if (name === 'openai') {
+              await provider.models.list();
+              healthStatus.providers[name] = 'healthy';
+            } else {
+              healthStatus.providers[name] = 'configured';
+            }
+          } catch (error) {
+            healthStatus.providers[name] = 'error';
+          }
+        } else {
+          healthStatus.providers[name] = 'not_configured';
+        }
+      }
+
+      this.lastHealthCheck = now;
+      this.lastHealthCheckResult = healthStatus;
+    }
+    
+    return this.lastHealthCheckResult;
   }
 
   getStats() {
