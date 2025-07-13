@@ -1579,7 +1579,15 @@ app.post('/api/chat', async (req, res) => {
 app.get('/api/health', async (req, res) => {
   try {
     const healthCheck = await agiAgent.healthCheck();
-    const status = healthCheck.database && healthCheck.providers.openai !== 'error' ? 'healthy' : 'degraded';
+    
+    if (!healthCheck) {
+      throw new Error('Health check returned undefined');
+    }
+    
+    const status = healthCheck.database && 
+                  healthCheck.providers && 
+                  Object.values(healthCheck.providers).some(p => p === 'healthy' || p === 'configured') 
+                  ? 'healthy' : 'degraded';
     
     res.status(status === 'healthy' ? 200 : 503).json({
       status,
@@ -1592,7 +1600,9 @@ app.get('/api/health', async (req, res) => {
     res.status(503).json({
       status: 'unhealthy',
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      database: dbConnected,
+      providers: Object.keys(aiProviders).filter(p => aiProviders[p])
     });
   }
 });
