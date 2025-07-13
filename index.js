@@ -419,7 +419,7 @@ class UltraAdvancedToolSystem extends EventEmitter {
            ON CONFLICT (tool_name) DO UPDATE SET
            execution_count = tool_analytics.execution_count + 1,
            success_count = tool_analytics.success_count + $2,
-           avg_execution_time = $4,
+           avg_execution_time = $4),
            error_patterns = $5,
            last_executed = $6`,
           [
@@ -826,7 +826,7 @@ class UltraAdvancedToolSystem extends EventEmitter {
     return {
       code: `// Generated ${language} code for: ${task}
 console.log("Task: ${task}");
-// Add your implementation here`,
+ // Add your implementation here`,
       explanation: `This code implements ${task} in ${language}`,
       quality: 0.8,
       timestamp: new Date().toISOString()
@@ -1142,7 +1142,7 @@ class UltraAdvancedMemoryManager {
       try {
         const result = await pool.query(
           `SELECT user_profile, preferences, learning_data, personality_traits, knowledge_graph
-           FROM conversations WHERE session_id = $1`,
+           FROM conversations WHERE session_id = $1,
           [sessionId]
         );
         
@@ -2324,7 +2324,7 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
     if (learningPatterns.patterns.length > 0) {
       // Simple pattern matching - can be enhanced with ML
       const relevantPatterns = learningPatterns.patterns.filter(pattern => 
-        pattern.messageType === this.classifyMessageType(message)
+pattern.messageType === this.classifyMessageType(message)
       );
 
       if (relevantPatterns.length > 0) {
@@ -2641,7 +2641,7 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
         },
         {
           headers: {
-            'Authorization': `Bearer ${aiProviders.groq.apiKey}`,
+            'Authorization`: `Bearer ${aiProviders.groq.apiKey}`,
             'Content-Type': 'application/json'
           },
           timeout: aiProviders.groq.timeout
@@ -2837,10 +2837,10 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
   extractMemoryKey(message) {
     // Extract key for memory operations
     const keyPatterns = [
-      /kaydet\s+(.+?)\s+olarak/i,
-      /store\s+(.+?)\s+as/i,
-      /hatırla\s+(.+?)(?:\s|$)/i,
-      /remember\s+(.+?)(?:\s|$)/i
+      /kaydet\\s+(.+?)\\s+olarak/i,
+      /store\\s+(.+?)\\s+as/i,
+      /hatırla\\s+(.+?)(?:\\s|$)/i,
+      /remember\\s+(.+?)(?:\\s|$)/i
     ];
     
     for (const pattern of keyPatterns) {
@@ -2856,8 +2856,8 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
   extractMemoryValue(message) {
     // Extract value to store in memory
     const valuePatterns = [
-      /kaydet\s+(.+)/i,
-      /store\s+(.+)/i
+      /kaydet\\s+(.+)/i,
+      /store\\s+(.+)/i
     ];
     
     for (const pattern of valuePatterns) {
@@ -2898,9 +2898,9 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
   extractCodeTask(message) {
     // Extract what kind of code to generate
     const taskPatterns = [
-      /kod.*?(?:yap|oluştur|generate).*?(.+?)(?:\s|$)/i,
-      /code.*?(?:for|to).*?(.+?)(?:\s|$)/i,
-      /(function|fonksiyon).*?(.+?)(?:\s|$)/i
+      /kod.*?(?:yap|oluştur|generate).*?(.+?)(?:\\s|$)/i,
+      /code.*?(?:for|to).*?(.+?)(?:\\s|$)/i,
+      /(function|fonksiyon).*?(.+?)(?:\\s|$)/i
     ];
     
     for (const pattern of taskPatterns) {
@@ -2916,8 +2916,8 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
   extractCodeRequirements(message) {
     // Extract specific requirements for code generation
     const reqPatterns = [
-      /(?:requirements|gereksinimler):\s*(.+)/i,
-      /(?:should|olmalı).*?(.+?)(?:\s|$)/i
+      /(?:requirements|gereksinimler):\\s*(.+)/i,
+      /(?:should|olmalı).*?(.+?)(?:\\s|$)/i
     ];
     
     for (const pattern of reqPatterns) {
@@ -2977,7 +2977,7 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
 
   extractFilePath(message) {
     // Extract file path from message
-    const pathPattern = /(?:path|yol):\s*([^\s]+)/i;
+    const pathPattern = /(?:path|yol):\\s*([^\\s]+)/i;
     const match = message.match(pathPattern);
     
     if (match) {
@@ -2985,7 +2985,7 @@ Evolution Cycle: ${this.evolutionCycle} | Capabilities: ${Object.keys(this.capab
     }
     
     // Look for file extensions
-    const filePattern = /([^\s]+\.\w+)/;
+    const filePattern = /([^\\s]+\\.\\w+)/;
     const fileMatch = message.match(filePattern);
     
     if (fileMatch) {
@@ -4066,6 +4066,24 @@ async function startUltraAdvancedServer() {
         logger.info('🔧 Development mode: Debug features enabled');
       }
     });
+    
+    // Eklenti: Doğal dil CLI modu
+    const readline = require('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      prompt: 'AGI> '
+    });
+    rl.on('line', async (input) => {
+      if (input.trim()) {
+        const sessionId = 'cli_session';
+        const response = await ultraAGI.processMessage(sessionId, input);
+        console.log(`AGI: ${response.content}`);
+      }
+      rl.prompt();
+    });
+    rl.prompt();
+    logger.info('✅ CLI modu aktif: Konsoldan doğal dil komutları girin.');
     
     logger.info('🎉 Ultra Advanced AGI Agent initialization completed successfully!');
     
