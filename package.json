@@ -1,94 +1,26 @@
 {
-  "name": "enhanced-agi-agent",
-  "version": "2.0.0",
-  "description": "Enhanced AGI Agent with memory, tools, multi-provider AI support, and Railway deployment optimization",
-  "main": "index.js",
+  "name": "ultra-advanced-agi-agent",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "build": "echo 'Build completed - No build process required'",
-    "dev": "nodemon index.js --ignore logs/ --ignore *.log",
-    "test": "node --experimental-vm-modules --experimental-json-modules test.js",
-    "test:health": "curl -f http://localhost:3000/health || exit 1",
-    "test:chat": "node test-chat.js",
-    "db:migrate": "node migrate.js",
-    "logs": "tail -f logs/app.log",
-    "clean": "rm -rf logs/*.log && rm -rf node_modules/.cache",
-    "railway:deploy": "railway up",
-    "railway:logs": "railway logs",
-    "validate": "node validate-config.js"
-  },
-  "keywords": [
-    "ai",
-    "agi",
-    "chatbot",
-    "openai",
-    "deepseek",
-    "anthropic",
-    "websocket",
-    "memory",
-    "tools",
-    "railway",
-    "postgresql"
-  ],
-  "author": "Enhanced AGI Agent Developer",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "dev": "node --watch index.js"
   },
   "dependencies": {
     "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "pg": "^8.11.3",
+    "openai": "^4.20.1",
+    "axios": "^1.6.0",
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
     "compression": "^1.7.4",
-    "express-session": "^1.17.3",
     "winston": "^3.11.0",
     "node-cache": "^5.1.2",
-    "openai": "^4.24.1",
-    "axios": "^1.6.2",
-    "pg": "^8.11.3",
-    "ws": "^8.14.2",
-    "dotenv": "^16.3.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/enhanced-agi-agent.git"
-  },
-  "bugs": {
-    "url": "https://github.com/your-username/enhanced-agi-agent/issues"
-  },
-  "homepage": "https://github.com/your-username/enhanced-agi-agent#readme",
-  "railway": {
-    "build": {
-      "command": "npm install"
-    },
-    "start": {
-      "command": "npm start"
-    }
-  },
-  "env": {
-    "NODE_ENV": "production",
-    "PORT": "$PORT",
-    "DATABASE_URL": "$DATABASE_URL",
-    "OPENAI_API_KEY": "$OPENAI_API_KEY",
-    "DEEPSEEK_API_KEY": "$DEEPSEEK_API_KEY",
-    "ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
-    "SESSION_SECRET": "$SESSION_SECRET",
-    "LOG_LEVEL": "info",
-    "ALLOWED_ORIGINS": "*"
-  },
-  "nodemonConfig": {
-    "ignore": [
-      "logs/",
-      "*.log",
-      "node_modules/",
-      ".git/"
-    ],
-    "ext": "js,json",
-    "delay": 1000
+    "express-session": "^1.17.3",
+    "dotenv": "^16.3.1",
+    "cheerio": "^1.0.0-rc.12",
+    "nodemailer": "^6.9.7",
+    "node-cron": "^3.0.3"
   }
 }
