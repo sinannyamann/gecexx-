@@ -1575,6 +1575,28 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  try {
+    const healthCheck = await agiAgent.healthCheck();
+    const status = healthCheck.database && healthCheck.providers.openai !== 'error' ? 'healthy' : 'degraded';
+    
+    res.status(status === 'healthy' ? 200 : 503).json({
+      status,
+      service: 'enhanced-agi-agent',
+      version: '2.0.0',
+      ...healthCheck
+    });
+  } catch (error) {
+    logger.error('Health check error:', error);
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Enhanced stats endpoint
 app.get('/api/stats', async (req, res) => {
   try {
