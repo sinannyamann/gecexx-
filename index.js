@@ -1346,7 +1346,12 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.get('/', async (req, res) => {
+app.get('/', (req, res) => {
+  res.sendFile(join(__dirname, 'advanced_ai_agent_interface.html'));
+});
+
+// Stats page endpoint
+app.get('/stats', async (req, res) => {
   try {
     const stats = agiAgent.getStats();
     
@@ -1356,7 +1361,7 @@ app.get('/', async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>🤖 Enhanced AGI Agent</title>
+        <title>🤖 Enhanced AGI Agent - Stats</title>
         <style>
           body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -1387,12 +1392,14 @@ app.get('/', async (req, res) => {
           .features { margin-top: 30px; }
           .feature-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
           .feature { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; }
+          .back-link { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 25px; text-decoration: none; color: white; backdrop-filter: blur(10px); }
         </style>
       </head>
       <body>
+        <a href="/" class="back-link">← Chat Arayüzüne Dön</a>
         <div class="container">
           <div class="header">
-            <h1>🤖 Enhanced AGI Agent</h1>
+            <h1>🤖 Enhanced AGI Agent - İstatistikler</h1>
             <p>Next-Generation AI Assistant with Advanced Capabilities</p>
             <div class="version">v2.0.0 - Production Ready</div>
           </div>
@@ -1490,7 +1497,7 @@ app.get('/', async (req, res) => {
       </html>
     `);
   } catch (error) {
-    logger.error('Homepage error:', error);
+    logger.error('Stats page error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
