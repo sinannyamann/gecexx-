@@ -819,4 +819,536 @@ Size nasıl yardımcı olabilirim? 🌟`,
                         bypassCache: !this.useCache
                     };
 
-                    if (this.useWebSocket && this.ws && this.ws.rea
+                    if (this.useWebSocket && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        response = await this.sendWebSocketMessage(messageText, options);
+                    } else {
+                        response = await this.sendHttpMessage(messageText, options);
+                    }
+
+                    const responseTime = Date.now() - startTime;
+                    this.responseTimes.push(responseTime);
+                    this.updatePerformanceStats();
+
+                    this.hideTyping();
+                    this.addMessage({
+                        role: 'assistant',
+                        content: response.response || response.content || 'Cevap alındı',
+                        provider: response.provider,
+                        model: response.model,
+                        processingTime: response.processingTime,
+                        confidence: response.confidence,
+                        toolsUsed: response.toolsUsed,
+                        fromCache: response.fromCache,
+                        personalityInfluence: response.personalityInfluence,
+                        evolutionCycle: response.evolutionCycle,
+                        capabilities: response.capabilities,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+
+                    // Update AGI state
+                    if (response.personalityInfluence) {
+                        this.updatePersonalityDisplay(response.personalityInfluence);
+                    }
+                    if (response.evolutionCycle) {
+                        document.getElementById('evolutionCycle').textContent = `🧬 Cycle: ${response.evolutionCycle}`;
+                    }
+                    if (response.capabilities) {
+                        this.updateCapabilitiesDisplay(response.capabilities);
+                    }
+
+                    this.log(`✅ Cevap alındı: ${responseTime}ms (${response.provider})`, 'success');
+
+                } catch (error) {
+                    this.log(`❌ Mesaj gönderme hatası: ${error.message}`, 'error');
+                    this.hideTyping();
+                    this.addMessage({
+                        role: 'assistant',
+                        content: `❌ Üzgünüm, bir hata oluştu: ${error.message}\n\nLütfen bağlantınızı kontrol edin veya daha sonra tekrar deneyin. Debug panelinden detaylı bilgi alabilirsiniz.`,
+                        timestamp: new Date().toLocaleTimeString(),
+                        error: true
+                    });
+                    this.showToast('Mesaj gönderme hatası!', 'error');
+                } finally {
+                    this.isProcessing = false;
+                    this.sendButton.disabled = false;
+                    this.sendButton.textContent = 'Gönder';
+                }
+            }
+
+            async sendHttpMessage(message, options = {}) {
+                this.log(`📡 HTTP POST request to ${this.API_URL}/chat`);
+
+                const response = await fetch(`${this.API_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        options: options
+                    })
+                });
+
+                this.log(`📡 HTTP Response: ${response.status}`);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(`HTTP ${response.status}: ${errorData.error || response.statusText}`);
+                }
+
+                return await response.json();
+            }
+
+            async sendWebSocketMessage(message, options = {}) {
+                this.log('⚡ WebSocket mesajı gönderiliyor...');
+
+                return new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('WebSocket timeout (30s)'));
+                    }, 30000);
+
+                    const handler = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.type === 'response') {
+                                clearTimeout(timeout);
+                                this.ws.removeEventListener('message', handler);
+                                resolve(data.data);
+                            } else if (data.type === 'error') {
+                                clearTimeout(timeout);
+                                this.ws.removeEventListener('message', handler);
+                                reject(new Error(data.error));
+                            }
+                        } catch (error) {
+                            clearTimeout(timeout);
+                            this.ws.removeEventListener('message', handler);
+                            reject(error);
+                        }
+                    };
+
+                    this.ws.addEventListener('message', handler);
+                    this.ws.send(JSON.stringify({
+                        type: 'chat',
+                        content: message,
+                        sessionId: this.sessionId,
+                        options: options
+                    }));
+                });
+            }
+
+            initWebSocket() {
+                if (this.ws) {
+                    this.ws.close();
+                }
+
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+                this.log(`🔌 WebSocket bağlanıyor: ${wsUrl}`);
+
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    this.log('✅ WebSocket bağlandı!', 'success');
+                    document.getElementById('wsStatus').textContent = '🔌 WebSocket';
+                    document.getElementById('wsStatus').classList.add('highlight');
+                    this.showToast('WebSocket bağlantısı kuruldu!', 'success');
+                    
+                    // Mark WebSocket button as active
+                    document.querySelector('button[onclick="toggleWebSocket()"]').classList.add('active');
+                };
+
+                this.ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'welcome') {
+                            this.log(`🤖 AGI Agent welcome: Evolution Cycle ${data.evolutionCycle}`, 'success');
+                            if (data.capabilities) {
+                                this.updateCapabilitiesDisplay(data.capabilities);
+                            }
+                            if (data.personality) {
+                                this.updatePersonalityDisplay(data.personality);
+                            }
+                        }
+                    } catch (error) {
+                        this.log(`⚠️ WebSocket message parse error: ${error.message}`, 'warning');
+                    }
+                };
+
+                this.ws.onclose = () => {
+                    this.log('🔌 WebSocket bağlantısı kapandı', 'warning');
+                    document.getElementById('wsStatus').textContent = '🔌 HTTP';
+                    document.getElementById('wsStatus').classList.remove('highlight');
+                    this.useWebSocket = false;
+                    document.querySelector('button[onclick="toggleWebSocket()"]').classList.remove('active');
+                };
+
+                this.ws.onerror = (error) => {
+                    this.log(`❌ WebSocket hatası: ${error}`, 'error');
+                    this.showToast('WebSocket bağlantı hatası!', 'error');
+                };
+            }
+
+            addMessage(message) {
+                this.messages.push(message);
+                this.messageCount++;
+                this.renderMessage(message);
+                this.updateMessageCount();
+                
+                // Count tools used
+                if (message.toolsUsed && message.toolsUsed.length > 0) {
+                    this.toolsUsedCount += message.toolsUsed.length;
+                }
+                
+                this.updateDebugStats();
+            }
+
+            renderMessage(message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${message.role}`;
+
+                // Avatar
+                const avatar = document.createElement('div');
+                avatar.className = 'message-avatar';
+                if (message.role === 'user') {
+                    avatar.textContent = '👤';
+                } else if (message.role === 'system') {
+                    avatar.textContent = '⚙️';
+                } else {
+                    avatar.textContent = '🤖';
+                }
+
+                // Bubble
+                const bubble = document.createElement('div');
+                bubble.className = 'message-bubble';
+
+                // Header
+                const header = document.createElement('div');
+                header.className = 'message-header';
+
+                const sender = document.createElement('strong');
+                sender.textContent = message.role === 'user' ? 'Siz' : 
+                                   message.role === 'system' ? 'Sistem' : 
+                                   message.isWelcome ? 'AGI Agent (Self-Introduction)' : 'AGI Agent';
+                header.appendChild(sender);
+
+                const timestamp = document.createElement('span');
+                timestamp.textContent = message.timestamp;
+                header.appendChild(timestamp);
+
+                // Content
+                const content = document.createElement('div');
+                content.className = 'message-content';
+                content.textContent = message.content;
+
+                bubble.appendChild(header);
+                bubble.appendChild(content);
+
+                // Confidence bar for assistant messages
+                if (message.role === 'assistant' && message.confidence && !message.error) {
+                    const confidenceBar = document.createElement('div');
+                    confidenceBar.className = 'confidence-bar';
+                    
+                    const confidenceFill = document.createElement('div');
+                    confidenceFill.className = 'confidence-fill';
+                    confidenceFill.style.width = `${message.confidence * 100}%`;
+                    
+                    confidenceBar.appendChild(confidenceFill);
+                    bubble.appendChild(confidenceBar);
+                }
+
+                // Tools used
+                if (message.toolsUsed && message.toolsUsed.length > 0) {
+                    const toolsDiv = document.createElement('div');
+                    toolsDiv.className = 'tools-used';
+                    
+                    message.toolsUsed.forEach(tool => {
+                        const toolBadge = document.createElement('span');
+                        toolBadge.className = 'tool-badge';
+                        toolBadge.textContent = `🔧 ${typeof tool === 'string' ? tool : tool.tool || 'Unknown'}`;
+                        toolsDiv.appendChild(toolBadge);
+                    });
+                    
+                    bubble.appendChild(toolsDiv);
+                }
+
+                // Meta information
+                if (message.role === 'assistant' && !message.error && !message.isWelcome) {
+                    const meta = document.createElement('div');
+                    meta.className = 'message-meta';
+
+                    if (message.provider) meta.innerHTML += `<span>🤖 ${message.provider}</span>`;
+                    if (message.model) meta.innerHTML += `<span>📱 ${message.model}</span>`;
+                    if (message.processingTime) meta.innerHTML += `<span>⏱️ ${message.processingTime}ms</span>`;
+                    if (message.confidence) meta.innerHTML += `<span>🎯 ${(message.confidence * 100).toFixed(0)}%</span>`;
+                    if (message.fromCache) meta.innerHTML += `<span>💾 Cache</span>`;
+                    if (message.evolutionCycle) meta.innerHTML += `<span>🧬 Cycle ${message.evolutionCycle}</span>`;
+
+                    if (meta.innerHTML) {
+                        bubble.appendChild(meta);
+                    }
+                }
+
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(bubble);
+                this.messagesContainer.appendChild(messageDiv);
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            updatePersonalityDisplay(personalityInfluence) {
+                const traits = document.querySelectorAll('.personality-trait');
+                traits.forEach(trait => {
+                    trait.classList.remove('active');
+                });
+
+                // Activate traits based on influence
+                Object.keys(personalityInfluence).forEach(trait => {
+                    if (personalityInfluence[trait]) {
+                        const traitElement = Array.from(traits).find(t => 
+                            t.textContent.toLowerCase().includes(trait.toLowerCase()) ||
+                            (trait === 'empathy' && t.textContent.includes('Empatik')) ||
+                            (trait === 'creativity' && t.textContent.includes('Yaratıcı')) ||
+                            (trait === 'analytical' && t.textContent.includes('Analitik')) ||
+                            (trait === 'helpful' && t.textContent.includes('Yardımsever')) ||
+                            (trait === 'curious' && t.textContent.includes('Meraklı')) ||
+                            (trait === 'patient' && t.textContent.includes('Sabırlı'))
+                        );
+                        if (traitElement) {
+                            traitElement.classList.add('active');
+                        }
+                    }
+                });
+            }
+
+            updateCapabilitiesDisplay(capabilities) {
+                const activeCount = Object.values(capabilities).filter(c => c).length;
+                const totalCount = Object.keys(capabilities).length;
+                document.getElementById('capabilitiesIndicator').textContent = `${activeCount}/${totalCount} Capabilities`;
+            }
+
+            updateMessageCount() {
+                document.getElementById('messageCount').textContent = `📝 ${this.messageCount} mesaj`;
+            }
+
+            updatePerformanceStats() {
+                if (this.responseTimes.length > 0) {
+                    const avgTime = this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+                    document.getElementById('performanceInfo').textContent = `⚡ ${Math.round(avgTime)}ms`;
+                }
+            }
+
+            updateDebugStats() {
+                document.getElementById('debugSessionCount').textContent = '1';
+                document.getElementById('debugMessageCount').textContent = this.messageCount.toString();
+                document.getElementById('debugToolsUsed').textContent = this.toolsUsedCount.toString();
+                
+                if (this.responseTimes.length > 0) {
+                    const avgTime = this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+                    document.getElementById('debugAvgResponse').textContent = `${Math.round(avgTime)}ms`;
+                }
+            }
+
+            showTyping() {
+                this.typingIndicator.style.display = 'flex';
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            hideTyping() {
+                this.typingIndicator.style.display = 'none';
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = { timestamp, message, type };
+                this.debugLogs.push(logEntry);
+
+                const logDiv = document.createElement('div');
+                logDiv.className = `debug-log ${type}`;
+                logDiv.innerHTML = `<small>[${timestamp}]</small><br>${message}`;
+
+                this.debugLogsContainer.appendChild(logDiv);
+                this.debugLogsContainer.scrollTop = this.debugLogsContainer.scrollHeight;
+
+                console.log(`[${type.toUpperCase()}] ${message}`);
+
+                // Keep only last 100 logs
+                if (this.debugLogs.length > 100) {
+                    this.debugLogs.shift();
+                    this.debugLogsContainer.removeChild(this.debugLogsContainer.firstChild);
+                }
+            }
+
+            showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+
+                document.body.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.remove();
+                }, 4000);
+            }
+
+            async testConnection() {
+                this.log('🔍 Ultra Advanced AGI sistem bağlantısı test ediliyor...', 'info');
+
+                try {
+                    const healthResponse = await fetch('/health', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    this.log(`📡 Health endpoint: ${healthResponse.status}`, 
+                             healthResponse.ok ? 'success' : 'error');
+
+                    if (healthResponse.ok) {
+                        const healthData = await healthResponse.json();
+                        this.log(`✅ Server: ${healthData.service} v${healthData.version}`, 'success');
+                        this.log(`💾 Database: ${healthData.database ? 'PostgreSQL Connected' : 'Memory Mode'}`, 
+                                healthData.database ? 'success' : 'warning');
+                        
+                        const providerCount = Object.keys(healthData.providers || {}).length;
+                        this.log(`🤖 AI Providers: ${providerCount} configured`, 'success');
+                        
+                        document.getElementById('connectionStatus').textContent = 'Durum: Çevrimiçi ✅';
+                        document.getElementById('connectionStatus').classList.add('highlight');
+                        document.getElementById('statusIndicator').style.background = '#4ade80';
+
+                        if (healthData.providers) {
+                            const healthyProviders = Object.entries(healthData.providers)
+                                .filter(([_, status]) => status === 'healthy' || status === 'configured')
+                                .map(([name, _]) => name);
+                            
+                            document.getElementById('providerStatus').textContent = 
+                                `🤖 AI: ${healthyProviders.length > 0 ? healthyProviders.slice(0, 2).join(', ') : 'Test Mode'}`;
+                        }
+
+                        // Update capabilities if available
+                        if (healthData.capabilities) {
+                            this.updateCapabilitiesDisplay(healthData.capabilities);
+                        }
+
+                        this.showToast('AGI Agent bağlantısı başarılı! 🚀', 'success');
+                    } else {
+                        throw new Error(`Health check failed: ${healthResponse.status}`);
+                    }
+                } catch (error) {
+                    this.log(`❌ Bağlantı test hatası: ${error.message}`, 'error');
+                    document.getElementById('connectionStatus').textContent = 'Durum: Hata ❌';
+                    document.getElementById('statusIndicator').style.background = '#ef4444';
+                    this.showToast('Bağlantı hatası! Lütfen sunucu durumunu kontrol edin.', 'error');
+                }
+            }
+        }
+
+        // Global functions for feature buttons
+        let agiChat;
+
+        function toggleWebSocket() {
+            if (!agiChat.useWebSocket) {
+                agiChat.useWebSocket = true;
+                agiChat.initWebSocket();
+                agiChat.log('🔌 WebSocket etkinleştiriliyor...', 'info');
+            } else {
+                agiChat.useWebSocket = false;
+                if (agiChat.ws) {
+                    agiChat.ws.close();
+                }
+                agiChat.log('🔌 WebSocket devre dışı bırakılıyor...', 'warning');
+            }
+        }
+
+        function testWebSearch() {
+            const query = 'latest technology news 2024';
+            const testMessage = `Web'de ara: "${query}"`;
+            agiChat.log('🔍 Web Search tool testi başlatılıyor...', 'info');
+            agiChat.sendMessage(testMessage);
+        }
+
+        function testMemory() {
+            const testData = {
+                timestamp: new Date().toISOString(),
+                testValue: Math.random().toString(36).substring(2, 8),
+                userPreference: 'advanced_testing'
+            };
+            const testMessage = `Hafızaya kaydet: test_session_${Date.now()} = ${JSON.stringify(testData)}`;
+            agiChat.log('💾 Enhanced Memory tool testi başlatılıyor...', 'info');
+            agiChat.sendMessage(testMessage);
+        }
+
+        function testCodeGen() {
+            const testMessage = 'Python ile fibonacci sayı hesaplayan bir fonksiyon kodu yaz';
+            agiChat.log('💻 Code Generator tool testi başlatılıyor...', 'info');
+            agiChat.sendMessage(testMessage);
+        }
+
+        function testDataAnalysis() {
+            const testData = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            const testMessage = `Bu veriyi analiz et: ${JSON.stringify(testData)}. İstatistiksel analiz yap.`;
+            agiChat.log('📊 Data Analysis tool testi başlatılıyor...', 'info');
+            agiChat.sendMessage(testMessage);
+        }
+
+        function testSystem() {
+            agiChat.log('🖥️ System Info tool testi başlatılıyor...', 'info');
+            agiChat.sendMessage('Sistem bilgilerini ve performans metriklerini detaylı olarak göster');
+        }
+
+        function testLearning() {
+            const testMessage = 'Benim bu konuşmadaki davranış kalıplarımı analiz et ve öğrendiğin şeyleri söyle';
+            agiChat.log('🧠 Self Learning tool testi başlatılıyor...', 'info');
+            agiChat.sendMessage(testMessage);
+        }
+
+        function toggleDebug() {
+            const panel = document.getElementById('debugPanel');
+            panel.classList.toggle('open');
+        }
+
+        function clearDebugLogs() {
+            if (agiChat) {
+                agiChat.debugLogs = [];
+                agiChat.debugLogsContainer.innerHTML = '';
+                agiChat.log('🗑️ Debug logs cleared', 'info');
+            }
+        }
+
+        // Initialize the chat when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                agiChat = new UltraAdvancedAGIChat();
+                console.log('🚀 Ultra Advanced AGI Chat v4.0 initialized successfully');
+            } catch (error) {
+                console.error('❌ Failed to initialize AGI chat:', error);
+            }
+        });
+
+        // Add some visual flair
+        document.addEventListener('DOMContentLoaded', () => {
+            // Animate personality traits periodically
+            setInterval(() => {
+                const traits = document.querySelectorAll('.personality-trait.active');
+                traits.forEach((trait, index) => {
+                    setTimeout(() => {
+                        trait.style.transform = 'scale(1.05)';
+                        setTimeout(() => {
+                            trait.style.transform = 'scale(1)';
+                        }, 200);
+                    }, index * 100);
+                });
+            }, 5000);
+
+            // Add status indicator pulse effect
+            const statusIndicator = document.getElementById('statusIndicator');
+            setInterval(() => {
+                statusIndicator.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    statusIndicator.style.transform = 'scale(1)';
+                }, 300);
+            }, 3000);
+        });
+    </script>
+</body>
+</html>
